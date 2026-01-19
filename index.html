@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Ambulance Emergency</title>
+</head>
+<body>
+
+<h1>🚑 Ambulance Emergency</h1>
+
+<p>Junction:</p>
+<input type="text" id="junction">
+
+<p>Direction:</p>
+<input type="text" id="direction">
+
+<br><br>
+<button onclick="sendAlert()">SEND ALERT</button>
+
+<p id="status"></p>
+
+<script>
+function sendAlert() {
+
+  localStorage.setItem("junction",
+    document.getElementById("junction").value);
+
+  localStorage.setItem("direction",
+    document.getElementById("direction").value);
+
+  localStorage.setItem("time",
+    new Date().toLocaleTimeString());
+
+  // GPS
+  navigator.geolocation.getCurrentPosition(function(pos) {
+
+    localStorage.setItem("lat", pos.coords.latitude);
+    localStorage.setItem("lon", pos.coords.longitude);
+
+    document.getElementById("status").innerText =
+      "Alert Sent with Live Location";
+
+  });
+}
+</script>
+
+</body>
+</html>
