@@ -92,7 +92,7 @@
 
   <p>
     <b>Ambulance Location:</b><br>
-    <span id="loc">Waiting for ambulance…</span>
+    <span id="loc">Detecting location…</span>
   </p>
 
   <div id="map"></div>
@@ -118,7 +118,7 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap contributors"
 }).addTo(map);
 
-/* 🚑 Animated Ambulance Marker (NO CMR) */
+/* 🚑 Animated Ambulance Marker */
 const ambulanceIcon = L.divIcon({
   className: "",
   html: `
@@ -136,8 +136,9 @@ const ambulanceIcon = L.divIcon({
 
 let marker = null;
 let lastLatLng = null;
+let lastText = "";
 
-/* 🔄 Fetch & animate */
+/* 🔄 Fetch, animate & convert to location name */
 async function updateLocation() {
   const { data } = await supabaseClient
     .from("alerts")
@@ -146,13 +147,12 @@ async function updateLocation() {
     .single();
 
   if (data && data.location) {
-    document.getElementById("loc").innerText = data.location;
-
     const parts = data.location.split(",");
     const lat = parseFloat(parts[0]);
     const lng = parseFloat(parts[1]);
     const newLatLng = [lat, lng];
 
+    // Smooth marker movement
     if (!marker) {
       marker = L.marker(newLatLng, { icon: ambulanceIcon }).addTo(map);
       map.setView(newLatLng, 16);
@@ -161,31 +161,6 @@ async function updateLocation() {
       animateMarker(lastLatLng, newLatLng);
       lastLatLng = newLatLng;
     }
-  }
-}
 
-/* ✨ Smooth movement */
-function animateMarker(from, to) {
-  let step = 0;
-  const steps = 20;
-
-  const latStep = (to[0] - from[0]) / steps;
-  const lngStep = (to[1] - from[1]) / steps;
-
-  const interval = setInterval(() => {
-    step++;
-    marker.setLatLng([
-      from[0] + latStep * step,
-      from[1] + lngStep * step
-    ]);
-
-    if (step === steps) clearInterval(interval);
-  }, 100);
-}
-
-/* Update every 3 seconds */
-setInterval(updateLocation, 3000);
-</script>
-
-</body>
-</html>
+    // 🔁 Convert lat,lng → location name (only when changed)
+    if (data.lo
