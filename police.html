@@ -64,11 +64,31 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 
 /* 🚑 Ambulance icon */
-const ambulanceIcon = L.icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
-  iconSize: [45, 45],
-  iconAnchor: [22, 22]
+const ambulanceIcon = L.divIcon({
+  className: "cmr-marker",
+  html: `
+    <div style="
+      background: white;
+      border: 2px solid red;
+      border-radius: 50%;
+      width: 46px;
+      height: 46px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: red;
+      box-shadow: 0 0 6px rgba(0,0,0,0.4);
+    ">
+      <div style="font-size:18px; line-height:18px;">+</div>
+      <div style="font-size:11px;">CMR</div>
+    </div>
+  `,
+  iconSize: [46, 46],
+  iconAnchor: [23, 23]
 });
+
 
 let marker = null;
 let lastLatLng = null;
