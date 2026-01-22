@@ -1,45 +1,47 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Ambulance Emergency</title>
+  <title>Ambulance Device</title>
 </head>
 <body>
 
-<h1>🚑 Ambulance Emergency</h1>
+<h2>🚑 Ambulance Device</h2>
 
-<p>Junction:</p>
-<input type="text" id="junction">
+<input type="text" id="location" placeholder="Enter Location"><br><br>
+<input type="text" id="direction" placeholder="Enter Direction"><br><br>
 
-<p>Direction:</p>
-<input type="text" id="direction">
-
-<br><br>
 <button onclick="sendAlert()">SEND ALERT</button>
 
-<p id="status"></p>
+<p id="msg"></p>
+
+<!-- Supabase Library -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-function sendAlert() {
+const supabaseClient = supabase.createClient(
+  "https://inlkqessbewmxmtfvzfe.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
+);
 
-  localStorage.setItem("junction",
-    document.getElementById("junction").value);
+async function sendAlert() {
+  const location = document.getElementById("location").value;
+  const direction = document.getElementById("direction").value;
 
-  localStorage.setItem("direction",
-    document.getElementById("direction").value);
+  const { error } = await supabaseClient
+    .from("alerts")
+    .upsert({
+      id: 1,
+      location: location,
+      direction: direction,
+      time: new Date().toLocaleTimeString()
+    });
 
-  localStorage.setItem("time",
-    new Date().toLocaleTimeString());
-
-  // GPS
-  navigator.geolocation.getCurrentPosition(function(pos) {
-
-    localStorage.setItem("lat", pos.coords.latitude);
-    localStorage.setItem("lon", pos.coords.longitude);
-
-    document.getElementById("status").innerText =
-      "Alert Sent with Live Location";
-
-  });
+  if (error) {
+    alert("Error: " + error.message);
+  } else {
+    document.getElementById("msg").innerText =
+      "✅ Alert sent successfully";
+  }
 }
 </script>
 
