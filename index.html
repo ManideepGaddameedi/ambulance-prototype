@@ -1,50 +1,19 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Ambulance Device</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body { font-family: Arial; background:#f4f6f9; }
-    .box {
-      max-width:420px; margin:40px auto; background:#fff;
-      padding:20px; border-radius:10px;
-      box-shadow:0 4px 10px rgba(0,0,0,.2);
-      text-align:center;
-    }
-    button {
-      width:100%; padding:12px; margin-top:10px;
-      font-size:16px; font-weight:bold; border:none;
-      border-radius:6px; cursor:pointer;
-    }
-    .start{background:green;color:white}
-    .stop{background:#333;color:white}
-    .alert{background:red;color:white}
-    input{width:100%;padding:8px;margin-top:10px}
-  </style>
-</head>
 <body>
 
-<div class="box">
-  <h2>🚑 Ambulance Device</h2>
-
-  <input id="location" placeholder="Detecting location…" readonly>
-
-  <button class="start" onclick="startTracking()">▶ START TRACKING</button>
-  <button class="stop" onclick="stopTracking()">⛔ STOP TRACKING</button>
-  <button class="alert" onclick="sendEmergency()">🚨 EMERGENCY ALERT</button>
-</div>
+<button onclick="start()">START</button>
+<button onclick="alertPolice()">ALERT</button>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
+  "YOUR_ANON_KEY"
 );
 
-let watchId=null;
-
-function startTracking(){
-  watchId = navigator.geolocation.watchPosition(async pos=>{
+function start() {
+  navigator.geolocation.watchPosition(async pos => {
     const lat = pos.coords.latitude;
     const lng = pos.coords.longitude;
 
@@ -52,34 +21,24 @@ function startTracking(){
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
     ).then(r=>r.json());
 
-    const place =
-      geo.address.suburb ||
-      geo.address.neighbourhood ||
+    const name =
       geo.address.city ||
       geo.address.town ||
-      geo.address.state ||
-      "Unknown area";
-
-    document.getElementById("location").value = place;
+      geo.address.village ||
+      "Unknown";
 
     await supabaseClient.from("alerts").upsert({
-      id:1,
-      location_name: place,
+      id: 1,
+      location_name: name,
       latitude: lat,
-      longitude: lng,
-      alert: false
+      longitude: lng
     });
-  },()=>alert("Location denied"),{enableHighAccuracy:true});
+  });
 }
 
-function stopTracking(){
-  if(watchId) navigator.geolocation.clearWatch(watchId);
-}
-
-async function sendEmergency(){
+async function alertPolice() {
   await supabaseClient.from("alerts")
-    .update({alert:true}).eq("id",1);
-  alert("Emergency sent to police");
+    .update({ alert: true }).eq("id",1);
 }
 </script>
 
