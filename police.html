@@ -57,13 +57,6 @@
       line-height: 14px;
     }
 
-    .ambulance-bottom {
-      font-size: 10px;
-      font-weight: bold;
-      text-align: center;
-      line-height: 10px;
-    }
-
     /* 🚨 Flashing lights */
     .light-left, .light-right {
       width: 6px;
@@ -125,7 +118,7 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap contributors"
 }).addTo(map);
 
-/* 🚑 Animated Ambulance Marker */
+/* 🚑 Animated Ambulance Marker (NO CMR) */
 const ambulanceIcon = L.divIcon({
   className: "",
   html: `
@@ -135,7 +128,6 @@ const ambulanceIcon = L.divIcon({
 
       <div class="ambulance-top">108</div>
       <div class="ambulance-plus">+</div>
-      <div class="ambulance-bottom">CMR</div>
     </div>
   `,
   iconSize: [64, 34],
