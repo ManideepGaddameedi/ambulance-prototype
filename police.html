@@ -11,66 +11,86 @@
   />
 
   <style>
-  .ambulance-box {
-    width: 64px;
-    height: 34px;
-    background: white;
-    border: 2px solid red;
-    border-radius: 6px;
-    position: relative;
-    font-family: Arial, sans-serif;
-    box-shadow: 0 0 8px rgba(0,0,0,0.4);
-  }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+    }
+    .box {
+      max-width: 440px;
+      margin: 30px auto;
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    }
+    #map {
+      height: 340px;
+      margin-top: 10px;
+      border-radius: 8px;
+    }
 
-  .ambulance-top {
-    font-size: 11px;
-    font-weight: bold;
-    color: red;
-    text-align: center;
-  }
+    /* 🚑 Ambulance vehicle */
+    .ambulance-box {
+      width: 64px;
+      height: 34px;
+      background: white;
+      border: 2px solid red;
+      border-radius: 6px;
+      position: relative;
+      box-shadow: 0 0 8px rgba(0,0,0,0.4);
+      font-family: Arial, sans-serif;
+    }
 
-  .ambulance-plus {
-    font-size: 16px;
-    font-weight: bold;
-    color: red;
-    text-align: center;
-    line-height: 14px;
-  }
+    .ambulance-top {
+      font-size: 12px;
+      font-weight: bold;
+      color: red;
+      text-align: center;
+      line-height: 12px;
+    }
 
-  .ambulance-bottom {
-    font-size: 10px;
-    font-weight: bold;
-    text-align: center;
-  }
+    .ambulance-plus {
+      font-size: 16px;
+      font-weight: bold;
+      color: red;
+      text-align: center;
+      line-height: 14px;
+    }
 
-  /* 🚨 Flashing lights */
-  .light-left, .light-right {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    position: absolute;
-    top: -5px;
-    animation: flash 1s infinite;
-  }
+    .ambulance-bottom {
+      font-size: 10px;
+      font-weight: bold;
+      text-align: center;
+      line-height: 10px;
+    }
 
-  .light-left {
-    left: 8px;
-    background: red;
-  }
+    /* 🚨 Flashing lights */
+    .light-left, .light-right {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      position: absolute;
+      top: -5px;
+      animation: flash 1s infinite;
+    }
 
-  .light-right {
-    right: 8px;
-    background: blue;
-    animation-delay: 0.5s;
-  }
+    .light-left {
+      left: 10px;
+      background: red;
+    }
 
-  @keyframes flash {
-    0% { opacity: 1; }
-    50% { opacity: 0.2; }
-    100% { opacity: 1; }
-  }
-</style>
+    .light-right {
+      right: 10px;
+      background: blue;
+      animation-delay: 0.5s;
+    }
 
+    @keyframes flash {
+      0% { opacity: 1; }
+      50% { opacity: 0.2; }
+      100% { opacity: 1; }
+    }
+  </style>
 </head>
 <body>
 
@@ -79,7 +99,7 @@
 
   <p>
     <b>Ambulance Location:</b><br>
-    <span id="loc">Waiting for ambulance...</span>
+    <span id="loc">Waiting for ambulance…</span>
   </p>
 
   <div id="map"></div>
@@ -92,20 +112,20 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* 🔗 Supabase connection */
+/* 🔗 Supabase */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-/* 🗺️ Initialize map */
+/* 🗺 Map */
 let map = L.map("map").setView([17.385, 78.4867], 15);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap contributors"
 }).addTo(map);
 
-/* 🚑 Ambulance icon */
+/* 🚑 Animated Ambulance Marker */
 const ambulanceIcon = L.divIcon({
   className: "",
   html: `
@@ -122,12 +142,10 @@ const ambulanceIcon = L.divIcon({
   iconAnchor: [32, 17]
 });
 
-
-
 let marker = null;
 let lastLatLng = null;
 
-/* 🔄 Fetch & animate ambulance location */
+/* 🔄 Fetch & animate */
 async function updateLocation() {
   const { data } = await supabaseClient
     .from("alerts")
@@ -144,10 +162,7 @@ async function updateLocation() {
     const newLatLng = [lat, lng];
 
     if (!marker) {
-      marker = L.marker(newLatLng, {
-        icon: ambulanceIcon
-      }).addTo(map);
-
+      marker = L.marker(newLatLng, { icon: ambulanceIcon }).addTo(map);
       map.setView(newLatLng, 16);
       lastLatLng = newLatLng;
     } else {
@@ -157,7 +172,7 @@ async function updateLocation() {
   }
 }
 
-/* ✨ Smooth animation function */
+/* ✨ Smooth movement */
 function animateMarker(from, to) {
   let step = 0;
   const steps = 20;
@@ -166,15 +181,13 @@ function animateMarker(from, to) {
   const lngStep = (to[1] - from[1]) / steps;
 
   const interval = setInterval(() => {
-    step++;a
-    const lat = from[0] + latStep * step;
-    const lng = from[1] + lngStep * step;
+    step++;
+    marker.setLatLng([
+      from[0] + latStep * step,
+      from[1] + lngStep * step
+    ]);
 
-    marker.setLatLng([lat, lng]);
-
-    if (step === steps) {
-      clearInterval(interval);
-    }
+    if (step === steps) clearInterval(interval);
   }, 100);
 }
 
