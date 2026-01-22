@@ -2,15 +2,16 @@
 <html>
 <head>
   <title>Traffic Police Control</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
       font-family: Arial, sans-serif;
       background: #f4f6f9;
     }
     .box {
-      width: 420px;
+      max-width: 420px;
       margin: 40px auto;
-      background: #fff;
+      background: white;
       padding: 20px;
       border-radius: 10px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
@@ -34,13 +35,7 @@
     <b>Time:</b> <span id="time">---</span>
   </p>
 
-  <!-- Google Map -->
-  <iframe
-    id="map"
-    src="https://www.google.com/maps?q=India&output=embed"
-    allowfullscreen
-    loading="lazy">
-  </iframe>
+  <iframe id="map" src=""></iframe>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -51,33 +46,32 @@ const supabaseClient = supabase.createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-let lastLocation = "";
+let lastLoc = "";
 
-async function getAlert() {
+async function loadAlert() {
   const { data } = await supabaseClient
     .from("alerts")
     .select("*")
     .eq("id", 1)
     .single();
 
-  if (data) {
+  if (data && data.location) {
     document.getElementById("loc").innerText = data.location;
     document.getElementById("dir").innerText = data.direction;
     document.getElementById("time").innerText = data.time;
 
-    // 🔥 SAFE MAP UPDATE (GitHub-compatible)
-    if (data.location && data.location !== lastLocation) {
+    if (data.location !== lastLoc) {
       document.getElementById("map").src =
         "https://www.google.com/maps?q=" +
         encodeURIComponent(data.location) +
-        "&hl=en&z=15&output=embed";
+        "&z=16&output=embed";
 
-      lastLocation = data.location;
+      lastLoc = data.location;
     }
   }
 }
 
-setInterval(getAlert, 3000);
+setInterval(loadAlert, 3000);
 </script>
 
 </body>
