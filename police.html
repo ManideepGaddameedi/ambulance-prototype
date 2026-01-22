@@ -16,17 +16,72 @@
       background: #f4f6f9;
     }
     .box {
-      max-width: 430px;
+      max-width: 440px;
       margin: 30px auto;
       background: white;
       padding: 15px;
       border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
     }
     #map {
-      height: 320px;
+      height: 340px;
       margin-top: 10px;
       border-radius: 8px;
+    }
+
+    /* 🚑 Ambulance vehicle */
+    .ambulance-box {
+      width: 64px;
+      height: 34px;
+      background: white;
+      border: 2px solid red;
+      border-radius: 6px;
+      position: relative;
+      box-shadow: 0 0 8px rgba(0,0,0,0.4);
+      font-family: Arial, sans-serif;
+    }
+
+    .ambulance-top {
+      font-size: 12px;
+      font-weight: bold;
+      color: red;
+      text-align: center;
+      line-height: 12px;
+    }
+
+    .ambulance-plus {
+      font-size: 16px;
+      font-weight: bold;
+      color: red;
+      text-align: center;
+      line-height: 14px;
+    }
+
+    /* 🚨 Flashing lights */
+    .light-left, .light-right {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      position: absolute;
+      top: -5px;
+      animation: flash 1s infinite;
+    }
+
+    .light-left {
+      left: 10px;
+      background: red;
+    }
+
+    .light-right {
+      right: 10px;
+      background: blue;
+      animation-delay: 0.5s;
+    }
+
+    @keyframes flash {
+      0% { opacity: 1; }
+      50% { opacity: 0.2; }
+      100% { opacity: 1; }
     }
   </style>
 </head>
@@ -37,7 +92,7 @@
 
   <p>
     <b>Ambulance Location:</b><br>
-    <span id="loc">Waiting for ambulance...</span>
+    <span id="loc">Waiting for ambulance…</span>
   </p>
 
   <div id="map"></div>
@@ -50,30 +105,39 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* 🔗 Supabase connection */
+/* 🔗 Supabase */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-/* 🗺️ Initialize map */
+/* 🗺 Map */
 let map = L.map("map").setView([17.385, 78.4867], 15);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap contributors"
 }).addTo(map);
 
-/* 🚑 Ambulance icon */
-const ambulanceIcon = L.icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
-  iconSize: [45, 45],
-  iconAnchor: [22, 22]
+/* 🚑 Animated Ambulance Marker (NO CMR) */
+const ambulanceIcon = L.divIcon({
+  className: "",
+  html: `
+    <div class="ambulance-box">
+      <div class="light-left"></div>
+      <div class="light-right"></div>
+
+      <div class="ambulance-top">108</div>
+      <div class="ambulance-plus">+</div>
+    </div>
+  `,
+  iconSize: [64, 34],
+  iconAnchor: [32, 17]
 });
 
 let marker = null;
 let lastLatLng = null;
 
-/* 🔄 Fetch & animate ambulance location */
+/* 🔄 Fetch & animate */
 async function updateLocation() {
   const { data } = await supabaseClient
     .from("alerts")
@@ -90,10 +154,7 @@ async function updateLocation() {
     const newLatLng = [lat, lng];
 
     if (!marker) {
-      marker = L.marker(newLatLng, {
-        icon: ambulanceIcon
-      }).addTo(map);
-
+      marker = L.marker(newLatLng, { icon: ambulanceIcon }).addTo(map);
       map.setView(newLatLng, 16);
       lastLatLng = newLatLng;
     } else {
@@ -103,7 +164,7 @@ async function updateLocation() {
   }
 }
 
-/* ✨ Smooth animation function */
+/* ✨ Smooth movement */
 function animateMarker(from, to) {
   let step = 0;
   const steps = 20;
@@ -113,14 +174,12 @@ function animateMarker(from, to) {
 
   const interval = setInterval(() => {
     step++;
-    const lat = from[0] + latStep * step;
-    const lng = from[1] + lngStep * step;
+    marker.setLatLng([
+      from[0] + latStep * step,
+      from[1] + lngStep * step
+    ]);
 
-    marker.setLatLng([lat, lng]);
-
-    if (step === steps) {
-      clearInterval(interval);
-    }
+    if (step === steps) clearInterval(interval);
   }, 100);
 }
 
