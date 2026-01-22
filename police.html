@@ -5,70 +5,48 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f9;
-    }
+    body { font-family: Arial; background:#f4f6f9; }
     .box {
-      max-width: 460px;
-      margin: 30px auto;
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+      max-width:460px; margin:30px auto; background:#fff;
+      padding:15px; border-radius:10px;
+      box-shadow:0 4px 10px rgba(0,0,0,.25);
     }
-    #map {
-      height: 320px;
-      margin-top: 10px;
-      border-radius: 8px;
+    #map { height:320px; margin-top:10px; border-radius:8px; }
+
+    .enable {
+      width:100%; padding:12px; font-size:16px;
+      font-weight:bold; background:green; color:white;
+      border:none; border-radius:6px; cursor:pointer;
     }
 
-    /* 🚑 Ambulance */
+    .alert-text { color:red; font-weight:bold; margin-top:8px; }
+
     .ambulance-box {
-      width: 64px;
-      height: 34px;
-      background: white;
-      border: 2px solid red;
-      border-radius: 6px;
-      position: relative;
+      width:64px; height:34px; background:white;
+      border:2px solid red; border-radius:6px;
+      position:relative;
     }
     .ambulance-top {
-      font-size: 12px;
-      font-weight: bold;
-      color: red;
-      text-align: center;
+      font-size:12px; font-weight:bold;
+      color:red; text-align:center;
     }
     .ambulance-plus {
-      font-size: 16px;
-      font-weight: bold;
-      color: red;
-      text-align: center;
+      font-size:16px; font-weight:bold;
+      color:red; text-align:center;
     }
-
-    .light-left, .light-right {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      position: absolute;
-      top: -5px;
-      animation: flash 1s infinite;
+    .light-left,.light-right {
+      width:6px;height:6px;border-radius:50%;
+      position:absolute;top:-5px;
+      animation:flash 1s infinite;
     }
-    .light-left { left: 10px; background: red; }
-    .light-right { right: 10px; background: blue; animation-delay: .5s; }
+    .light-left { left:10px; background:red; }
+    .light-right { right:10px; background:blue; animation-delay:.5s; }
 
     @keyframes flash {
-      0% { opacity: 1; }
-      50% { opacity: .2; }
-      100% { opacity: 1; }
-    }
-
-    .alert-text {
-      color: red;
-      font-weight: bold;
-      margin-top: 8px;
+      0%{opacity:1}50%{opacity:.2}100%{opacity:1}
     }
   </style>
 </head>
@@ -77,11 +55,15 @@
 <div class="box">
   <h2>🚦 Traffic Police Control</h2>
 
+  <button class="enable" onclick="enableSound()">
+    🔊 ENABLE ALERT SOUND
+  </button>
+
+  <p class="alert-text" id="alertMsg"></p>
+
   <p><b>Ambulance Location:</b><br>
     <span id="loc">Waiting…</span>
   </p>
-
-  <p class="alert-text" id="alertMsg"></p>
 
   <div id="map"></div>
 </div>
@@ -94,68 +76,62 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
+let soundEnabled = false;
+let sirenOn = false;
+
+function enableSound() {
+  const s = document.getElementById("siren");
+  s.play().then(()=>{
+    s.pause(); s.currentTime=0;
+    soundEnabled = true;
+    alert("Alert sound enabled");
+  });
+}
+
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-let map = L.map("map").setView([17.385, 78.4867], 15);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+let map = L.map("map").setView([17.385,78.4867],15);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
+  .addTo(map);
 
 const ambulanceIcon = L.divIcon({
-  className: "",
-  html: `
-    <div class="ambulance-box">
-      <div class="light-left"></div>
-      <div class="light-right"></div>
-      <div class="ambulance-top">108</div>
-      <div class="ambulance-plus">+</div>
-    </div>
-  `,
-  iconSize: [64, 34],
-  iconAnchor: [32, 17]
+  className:"",
+  html:`<div class="ambulance-box">
+    <div class="light-left"></div>
+    <div class="light-right"></div>
+    <div class="ambulance-top">108</div>
+    <div class="ambulance-plus">+</div>
+  </div>`,
+  iconSize:[64,34], iconAnchor:[32,17]
 });
 
-let marker = null;
-let sirenOn = false;
+let marker=null;
 
-async function updateData() {
+async function updateData(){
   const { data } = await supabaseClient
-    .from("alerts")
-    .select("*")
-    .eq("id", 1)
-    .single();
+    .from("alerts").select("*").eq("id",1).single();
+  if(!data) return;
 
-  if (!data) return;
-
-  /* 🚨 Emergency alert */
-  if (data.alert === true) {
+  if(data.alert && soundEnabled && !sirenOn){
     document.getElementById("alertMsg").innerText =
       "🚨 EMERGENCY AMBULANCE APPROACHING";
-
-    if (!sirenOn) {
-      document.getElementById("siren").play();
-      sirenOn = true;
-    }
+    document.getElementById("siren").play();
+    sirenOn = true;
   }
 
-  /* 📍 Location */
-  if (data.location) {
-    const parts = data.location.split(",");
-    const lat = parseFloat(parts[0]);
-    const lng = parseFloat(parts[1]);
-    const pos = [lat, lng];
-
-    if (!marker) {
-      marker = L.marker(pos, { icon: ambulanceIcon }).addTo(map);
-      map.setView(pos, 16);
-    } else {
-      marker.setLatLng(pos);
-    }
+  if(data.location){
+    const [lat,lng] = data.location.split(",").map(Number);
+    if(!marker){
+      marker = L.marker([lat,lng],{icon:ambulanceIcon}).addTo(map);
+      map.setView([lat,lng],16);
+    } else marker.setLatLng([lat,lng]);
 
     const geo = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-    ).then(r => r.json());
+    ).then(r=>r.json());
 
     document.getElementById("loc").innerText =
       geo.address.suburb ||
@@ -165,7 +141,7 @@ async function updateData() {
   }
 }
 
-setInterval(updateData, 3000);
+setInterval(updateData,3000);
 </script>
 
 </body>
