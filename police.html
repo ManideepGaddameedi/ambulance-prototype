@@ -30,12 +30,11 @@
   <h2>🚦 Traffic Police Control</h2>
 
   <p>
-    <b>Location:</b> <span id="loc">---</span><br>
-    <b>Direction:</b> <span id="dir">---</span><br>
-    <b>Time:</b> <span id="time">---</span>
+    <b>Ambulance Location:</b><br>
+    <span id="loc">Waiting...</span>
   </p>
 
-  <iframe id="map" src=""></iframe>
+  <iframe id="map"></iframe>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -46,9 +45,9 @@ const supabaseClient = supabase.createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-let lastLoc = "";
+let lastLocation = "";
 
-async function loadAlert() {
+async function loadLocation() {
   const { data } = await supabaseClient
     .from("alerts")
     .select("*")
@@ -57,21 +56,20 @@ async function loadAlert() {
 
   if (data && data.location) {
     document.getElementById("loc").innerText = data.location;
-    document.getElementById("dir").innerText = data.direction;
-    document.getElementById("time").innerText = data.time;
 
-    if (data.location !== lastLoc) {
+    if (data.location !== lastLocation) {
       document.getElementById("map").src =
         "https://www.google.com/maps?q=" +
         encodeURIComponent(data.location) +
         "&z=16&output=embed";
 
-      lastLoc = data.location;
+      lastLocation = data.location;
     }
   }
 }
 
-setInterval(loadAlert, 3000);
+// Update map every 3 seconds
+setInterval(loadLocation, 3000);
 </script>
 
 </body>
