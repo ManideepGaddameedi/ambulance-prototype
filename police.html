@@ -2,18 +2,47 @@
 <html>
 <head>
   <title>Traffic Police Control</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+    }
+    .box {
+      width: 420px;
+      margin: 40px auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    h2 {
+      text-align: center;
+      color: #c62828;
+    }
+    iframe {
+      margin-top: 15px;
+      width: 100%;
+      height: 300px;
+      border: 0;
+    }
+  </style>
 </head>
 <body>
 
-<h2>🚦 Traffic Police Control</h2>
+<div class="box">
+  <h2>🚦 Traffic Police Control</h2>
 
-<p>
-Location: <span id="loc">---</span><br>
-Direction: <span id="dir">---</span><br>
-Time: <span id="time">---</span>
-</p>
+  <p>
+    <b>Location:</b> <span id="loc">---</span><br>
+    <b>Direction:</b> <span id="dir">---</span><br>
+    <b>Time:</b> <span id="time">---</span>
+  </p>
 
-<!-- Supabase Library -->
+  <!-- Google Map -->
+  <iframe id="map" loading="lazy"></iframe>
+</div>
+
+<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
@@ -22,8 +51,10 @@ const supabaseClient = supabase.createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
+let lastLocation = "";
+
 async function getAlert() {
-  const { data, error } = await supabaseClient
+  const { data } = await supabaseClient
     .from("alerts")
     .select("*")
     .eq("id", 1)
@@ -33,6 +64,16 @@ async function getAlert() {
     document.getElementById("loc").innerText = data.location;
     document.getElementById("dir").innerText = data.direction;
     document.getElementById("time").innerText = data.time;
+
+    // Update map ONLY if location changed (no blinking)
+    if (data.location && data.location !== lastLocation) {
+      document.getElementById("map").src =
+        "https://www.google.com/maps?q=" +
+        encodeURIComponent(data.location) +
+        "&output=embed";
+
+      lastLocation = data.location;
+    }
   }
 }
 
