@@ -4,37 +4,22 @@
   <title>Ambulance Device</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f9;
-    }
+    body { font-family: Arial; background:#f4f6f9; }
     .box {
-      max-width: 420px;
-      margin: 40px auto;
-      background: white;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-      text-align: center;
+      max-width:420px; margin:40px auto; background:#fff;
+      padding:20px; border-radius:10px;
+      box-shadow:0 4px 10px rgba(0,0,0,.2);
+      text-align:center;
     }
     button {
-      width: 100%;
-      padding: 12px;
-      margin-top: 12px;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      border: none;
-      border-radius: 6px;
+      width:100%; padding:12px; margin-top:10px;
+      font-size:16px; font-weight:bold; border:none;
+      border-radius:6px; cursor:pointer;
     }
-    .start { background: green; color: white; }
-    .stop { background: #333; color: white; }
-    .alert { background: red; color: white; }
-    input {
-      width: 100%;
-      padding: 8px;
-      margin-top: 10px;
-    }
+    .start{background:green;color:white}
+    .stop{background:#333;color:white}
+    .alert{background:red;color:white}
+    input{width:100%;padding:8px;margin-top:10px}
   </style>
 </head>
 <body>
@@ -42,84 +27,59 @@
 <div class="box">
   <h2>🚑 Ambulance Device</h2>
 
-  <input type="text" id="location" placeholder="Detecting location…" readonly>
+  <input id="location" placeholder="Detecting location…" readonly>
 
   <button class="start" onclick="startTracking()">▶ START TRACKING</button>
   <button class="stop" onclick="stopTracking()">⛔ STOP TRACKING</button>
-
   <button class="alert" onclick="sendEmergency()">🚨 EMERGENCY ALERT</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <script>
-/* 🔗 Supabase */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-let watchId = null;
+let watchId=null;
 
-/* ▶ Start real-time tracking */
-function startTracking() {
-  if (!navigator.geolocation) {
-    alert("Geolocation not supported");
-    return;
-  }
+function startTracking(){
+  watchId = navigator.geolocation.watchPosition(async pos=>{
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
 
-  watchId = navigator.geolocation.watchPosition(
-    async (pos) => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
+    const geo = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+    ).then(r=>r.json());
 
-      /* 🔁 Convert GPS → Location Name */
-      const geoRes = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-      );
-      const geo = await geoRes.json();
+    const place =
+      geo.address.suburb ||
+      geo.address.neighbourhood ||
+      geo.address.city ||
+      geo.address.town ||
+      geo.address.state ||
+      "Unknown area";
 
-      const place =
-        geo.address.suburb ||
-        geo.address.neighbourhood ||
-        geo.address.village ||
-        geo.address.town ||
-        geo.address.city ||
-        geo.address.state ||
-        "Unknown area";
+    document.getElementById("location").value = place;
 
-      document.getElementById("location").value = place;
-
-      /* 📤 Send location name to Supabase */
-      await supabaseClient
-        .from("alerts")
-        .upsert({
-          id: 1,
-          location: place,
-          time: new Date().toLocaleTimeString()
-        });
-    },
-    () => alert("Location permission denied"),
-    { enableHighAccuracy: true }
-  );
+    await supabaseClient.from("alerts").upsert({
+      id:1,
+      location_name: place,
+      latitude: lat,
+      longitude: lng,
+      alert: false
+    });
+  },()=>alert("Location denied"),{enableHighAccuracy:true});
 }
 
-/* ⛔ Stop tracking */
-function stopTracking() {
-  if (watchId) {
-    navigator.geolocation.clearWatch(watchId);
-    watchId = null;
-  }
+function stopTracking(){
+  if(watchId) navigator.geolocation.clearWatch(watchId);
 }
 
-/* 🚨 Emergency alert */
-async function sendEmergency() {
-  await supabaseClient
-    .from("alerts")
-    .update({ alert: true })
-    .eq("id", 1);
-
-  alert("Emergency alert sent to police!");
+async function sendEmergency(){
+  await supabaseClient.from("alerts")
+    .update({alert:true}).eq("id",1);
+  alert("Emergency sent to police");
 }
 </script>
 
