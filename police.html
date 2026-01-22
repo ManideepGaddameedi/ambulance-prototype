@@ -3,24 +3,30 @@
 <head>
   <title>Traffic Police Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
   <style>
     body {
       font-family: Arial, sans-serif;
       background: #f4f6f9;
     }
     .box {
-      max-width: 420px;
-      margin: 40px auto;
+      max-width: 430px;
+      margin: 30px auto;
       background: white;
-      padding: 20px;
+      padding: 15px;
       border-radius: 10px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }
-    iframe {
-      width: 100%;
-      height: 300px;
-      border: 0;
-      margin-top: 15px;
+    #map {
+      height: 320px;
+      margin-top: 10px;
+      border-radius: 8px;
     }
   </style>
 </head>
@@ -31,23 +37,44 @@
 
   <p>
     <b>Ambulance Location:</b><br>
-    <span id="loc">Waiting...</span>
+    <span id="loc">Waiting for ambulance...</span>
   </p>
 
-  <iframe id="map"></iframe>
+  <div id="map"></div>
 </div>
 
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
+/* 🔗 Supabase connection */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-let lastLocation = "";
+/* 🗺️ Initialize map */
+let map = L.map("map").setView([17.385, 78.4867], 15);
 
-async function loadLocation() {
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "© OpenStreetMap contributors"
+}).addTo(map);
+
+/* 🚑 Ambulance icon */
+const ambulanceIcon = L.icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
+  iconSize: [45, 45],
+  iconAnchor: [22, 22]
+});
+
+let marker = null;
+let lastLatLng = null;
+
+/* 🔄 Fetch & animate ambulance location */
+async function updateLocation() {
   const { data } = await supabaseClient
     .from("alerts")
     .select("*")
@@ -57,19 +84,48 @@ async function loadLocation() {
   if (data && data.location) {
     document.getElementById("loc").innerText = data.location;
 
-    if (data.location !== lastLocation) {
-      document.getElementById("map").src =
-        "https://www.google.com/maps?q=" +
-        encodeURIComponent(data.location) +
-        "&z=16&output=embed";
+    const parts = data.location.split(",");
+    const lat = parseFloat(parts[0]);
+    const lng = parseFloat(parts[1]);
+    const newLatLng = [lat, lng];
 
-      lastLocation = data.location;
+    if (!marker) {
+      marker = L.marker(newLatLng, {
+        icon: ambulanceIcon
+      }).addTo(map);
+
+      map.setView(newLatLng, 16);
+      lastLatLng = newLatLng;
+    } else {
+      animateMarker(lastLatLng, newLatLng);
+      lastLatLng = newLatLng;
     }
   }
 }
 
-// Update map every 3 seconds
-setInterval(loadLocation, 3000);
+/* ✨ Smooth animation function */
+function animateMarker(from, to) {
+  let step = 0;
+  const steps = 20;
+
+  const latStep = (to[0] - from[0]) / steps;
+  const lngStep = (to[1] - from[1]) / steps;
+
+  const interval = setInterval(() => {
+    step++;
+    const lat = from[0] + latStep * step;
+    const lng = from[1] + lngStep * step;
+
+    marker.setLatLng([lat, lng]);
+
+    if (step === steps) {
+      clearInterval(interval);
+    }
+  }, 100);
+}
+
+/* Update every 3 seconds */
+setInterval(updateLocation, 3000);
 </script>
 
 </body>
