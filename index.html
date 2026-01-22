@@ -20,10 +20,16 @@
     button {
       width: 100%;
       padding: 12px;
-      margin-top: 10px;
+      margin-top: 12px;
       font-size: 16px;
+      font-weight: bold;
       cursor: pointer;
+      border: none;
+      border-radius: 6px;
     }
+    .start { background: green; color: white; }
+    .stop { background: #333; color: white; }
+    .alert { background: red; color: white; }
     input {
       width: 100%;
       padding: 8px;
@@ -36,12 +42,12 @@
 <div class="box">
   <h2>🚑 Ambulance Device</h2>
 
-  <input type="text" id="location" placeholder="Tracking location..." readonly>
+  <input type="text" id="location" placeholder="Tracking location…" readonly>
 
-  <button onclick="startTracking()">▶ START TRACKING</button>
-  <button onclick="stopTracking()">⛔ STOP TRACKING</button>
+  <button class="start" onclick="startTracking()">▶ START TRACKING</button>
+  <button class="stop" onclick="stopTracking()">⛔ STOP TRACKING</button>
 
-  <p id="msg"></p>
+  <button class="alert" onclick="sendEmergency()">🚨 EMERGENCY ALERT</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -54,7 +60,7 @@ const supabaseClient = supabase.createClient(
 
 let watchId = null;
 
-// ▶ Start real-time tracking
+/* ▶ Start real-time GPS tracking */
 function startTracking() {
   if (!navigator.geolocation) {
     alert("Geolocation not supported");
@@ -62,43 +68,42 @@ function startTracking() {
   }
 
   watchId = navigator.geolocation.watchPosition(
-    async (position) => {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      const locText = lat + "," + lng;
+    async (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const loc = lat + "," + lng;
 
-      document.getElementById("location").value = locText;
+      document.getElementById("location").value = loc;
 
       await supabaseClient
         .from("alerts")
         .upsert({
           id: 1,
-          location: locText,
+          location: loc,
           time: new Date().toLocaleTimeString()
         });
-
-      document.getElementById("msg").innerText =
-        "📍 Tracking live location...";
     },
-    () => {
-      alert("Location permission denied");
-    },
-    {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 5000
-    }
+    () => alert("Location permission denied"),
+    { enableHighAccuracy: true }
   );
 }
 
-// ⛔ Stop tracking
+/* ⛔ Stop tracking */
 function stopTracking() {
-  if (watchId !== null) {
+  if (watchId) {
     navigator.geolocation.clearWatch(watchId);
     watchId = null;
-    document.getElementById("msg").innerText =
-      "⛔ Tracking stopped";
   }
+}
+
+/* 🚨 Emergency alert */
+async function sendEmergency() {
+  await supabaseClient
+    .from("alerts")
+    .update({ alert: true })
+    .eq("id", 1);
+
+  alert("Emergency alert sent to police!");
 }
 </script>
 
