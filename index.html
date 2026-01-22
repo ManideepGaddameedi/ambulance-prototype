@@ -2,17 +2,48 @@
 <html>
 <head>
   <title>Ambulance Device</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+    }
+    .box {
+      width: 420px;
+      margin: 40px auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    button {
+      padding: 10px;
+      width: 100%;
+      margin-top: 10px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 10px;
+    }
+  </style>
 </head>
 <body>
 
-<h2>🚑 Ambulance Device</h2>
+<div class="box">
+  <h2>🚑 Ambulance Device</h2>
 
-<input type="text" id="location" placeholder="Enter Location"><br><br>
-<input type="text" id="direction" placeholder="Enter Direction"><br><br>
+  <input type="text" id="location" placeholder="Location will appear here">
 
-<button onclick="sendAlert()">SEND ALERT</button>
+  <input type="text" id="direction" placeholder="Direction (LEFT / RIGHT / STRAIGHT)">
 
-<p id="msg"></p>
+  <button onclick="getCurrentLocation()">📍 GET CURRENT LOCATION</button>
+
+  <button onclick="sendAlert()">🚨 SEND ALERT</button>
+
+  <p id="msg"></p>
+</div>
 
 <!-- Supabase Library -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -23,9 +54,36 @@ const supabaseClient = supabase.createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
+// 📍 Get current device location
+function getCurrentLocation() {
+  if (!navigator.geolocation) {
+    alert("Geolocation not supported");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      document.getElementById("location").value =
+        lat + "," + lng;
+    },
+    () => {
+      alert("Location permission denied");
+    }
+  );
+}
+
+// 🚨 Send alert to Supabase
 async function sendAlert() {
   const location = document.getElementById("location").value;
   const direction = document.getElementById("direction").value;
+
+  if (location === "") {
+    alert("Please get location first");
+    return;
+  }
 
   const { error } = await supabaseClient
     .from("alerts")
