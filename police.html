@@ -1,58 +1,42 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Traffic Police Dashboard</title>
+  <title>Traffic Police Control</title>
 </head>
 <body>
 
-<h1>🚦 Traffic Police Dashboard</h1>
+<h2>🚦 Traffic Police Control</h2>
 
 <p>
-Junction: <span id="j"></span><br>
-Direction: <span id="d"></span><br>
-Time: <span id="t"></span>
+Location: <span id="loc">---</span><br>
+Direction: <span id="dir">---</span><br>
+Time: <span id="time">---</span>
 </p>
 
-<iframe
-  id="map"
-  width="100%"
-  height="400"
-  style="border:0;"
-  loading="lazy">
-</iframe>
+<!-- Supabase Library -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-let lastLat = null;
-let lastLon = null;
+const supabaseClient = supabase.createClient(
+  "https://inlkqessbewmxmtfvzfe.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
+);
 
-function updateMap() {
+async function getAlert() {
+  const { data, error } = await supabaseClient
+    .from("alerts")
+    .select("*")
+    .eq("id", 1)
+    .single();
 
-  document.getElementById("j").innerText =
-    localStorage.getItem("junction");
-
-  document.getElementById("d").innerText =
-    localStorage.getItem("direction");
-
-  document.getElementById("t").innerText =
-    localStorage.getItem("time");
-
-  var lat = localStorage.getItem("lat");
-  var lon = localStorage.getItem("lon");
-
-  // ✅ Only update map if location changed
-  if (lat && lon && (lat !== lastLat || lon !== lastLon)) {
-
-    document.getElementById("map").src =
-      "https://www.google.com/maps?q="
-      + lat + "," + lon + "&z=16&output=embed";
-
-    lastLat = lat;
-    lastLon = lon;
+  if (data) {
+    document.getElementById("loc").innerText = data.location;
+    document.getElementById("dir").innerText = data.direction;
+    document.getElementById("time").innerText = data.time;
   }
 }
 
-// Check every 1 second, but reload map ONLY if needed
-setInterval(updateMap, 1000);
+setInterval(getAlert, 3000);
 </script>
 
 </body>
