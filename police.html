@@ -65,29 +65,36 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 
 /* 🚑 Ambulance icon */
 const ambulanceIcon = L.divIcon({
-  className: "cmr-marker",
+  className: "ambulance-108-marker",
   html: `
     <div style="
+      width: 56px;
+      height: 44px;
       background: white;
       border: 2px solid red;
-      border-radius: 50%;
-      width: 46px;
-      height: 46px;
+      border-radius: 6px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-weight: bold;
-      color: red;
-      box-shadow: 0 0 6px rgba(0,0,0,0.4);
+      font-family: Arial, sans-serif;
+      box-shadow: 0 0 8px rgba(0,0,0,0.4);
     ">
-      <div style="font-size:18px; line-height:18px;">+</div>
-      <div style="font-size:11px;">CMR</div>
+      <div style="font-size:13px; font-weight:bold; color:red;">
+        108
+      </div>
+      <div style="font-size:18px; line-height:16px; color:red;">
+        +
+      </div>
+      <div style="font-size:10px; font-weight:bold; color:black;">
+        CMR
+      </div>
     </div>
   `,
-  iconSize: [46, 46],
-  iconAnchor: [23, 23]
+  iconSize: [56, 44],
+  iconAnchor: [28, 22]
 });
+
 
 
 let marker = null;
@@ -132,7 +139,7 @@ function animateMarker(from, to) {
   const lngStep = (to[1] - from[1]) / steps;
 
   const interval = setInterval(() => {
-    step++;
+    step++;a
     const lat = from[0] + latStep * step;
     const lng = from[1] + lngStep * step;
 
