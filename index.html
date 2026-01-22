@@ -20,7 +20,7 @@
     button {
       width: 100%;
       padding: 12px;
-      margin-top: 15px;
+      margin-top: 10px;
       font-size: 16px;
       cursor: pointer;
     }
@@ -36,11 +36,10 @@
 <div class="box">
   <h2>🚑 Ambulance Device</h2>
 
-  <input type="text" id="location" placeholder="Detecting current location..." readonly>
+  <input type="text" id="location" placeholder="Tracking location..." readonly>
 
-  <input type="text" id="direction" placeholder="Direction (LEFT / RIGHT / STRAIGHT)">
-
-  <button onclick="sendAlert()">🚨 SEND ALERT (USE DEVICE LOCATION)</button>
+  <button onclick="startTracking()">▶ START TRACKING</button>
+  <button onclick="stopTracking()">⛔ STOP TRACKING</button>
 
   <p id="msg"></p>
 </div>
@@ -53,62 +52,53 @@ const supabaseClient = supabase.createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-async function sendAlert() {
+let watchId = null;
+
+// ▶ Start real-time tracking
+function startTracking() {
   if (!navigator.geolocation) {
     alert("Geolocation not supported");
     return;
   }
 
-  navigator.geolocation.getCurrentPosition(
+  watchId = navigator.geolocation.watchPosition(
     async (position) => {
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
+      const locText = lat + "," + lng;
 
-      // 🔥 Convert GPS → Place Name (FREE)
-      const geoRes = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-      );
-      const geoData = await geoRes.json();
+      document.getElementById("location").value = locText;
 
-      const placeName =
-        geoData.address.suburb ||
-        geoData.address.neighbourhood ||
-        geoData.address.village ||
-        geoData.address.town ||
-        geoData.address.city ||
-        "Unknown location";
-
-      const city =
-        geoData.address.city ||
-        geoData.address.town ||
-        geoData.address.state ||
-        "";
-
-      const fullLocation = placeName + (city ? ", " + city : "");
-
-      document.getElementById("location").value = fullLocation;
-
-      const { error } = await supabaseClient
+      await supabaseClient
         .from("alerts")
         .upsert({
           id: 1,
-          location: fullLocation,
-          direction: document.getElementById("direction").value,
+          location: locText,
           time: new Date().toLocaleTimeString()
         });
 
-      if (error) {
-        alert("Error: " + error.message);
-      } else {
-        document.getElementById("msg").innerText =
-          "✅ Alert sent with location name";
-      }
+      document.getElementById("msg").innerText =
+        "📍 Tracking live location...";
     },
     () => {
       alert("Location permission denied");
     },
-    { enableHighAccuracy: true }
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 5000
+    }
   );
+}
+
+// ⛔ Stop tracking
+function stopTracking() {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    document.getElementById("msg").innerText =
+      "⛔ Tracking stopped";
+  }
 }
 </script>
 
