@@ -53,48 +53,42 @@ const supabaseClient = supabase.createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-function sendAlert() {
-  if (!navigator.geolocation) {
-    alert("Geolocation not supported");
-    return;
-  }
+// 🔥 FORCE GPS ASK WHEN PAGE LOADS
+window.onload = function () {
+  navigator.geolocation.getCurrentPosition(
+    () => {},
+    () => {}
+  );
+};
 
-  // 🔥 THIS WILL FORCE BROWSER TO ASK LOCATION PERMISSION
+function sendAlert() {
   navigator.geolocation.getCurrentPosition(
     async (position) => {
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
-      const direction = document.getElementById("direction").value;
+      const loc = lat + "," + lng;
 
-      const locText = lat + "," + lng;
-      document.getElementById("location").value = locText;
+      document.getElementById("location").value = loc;
 
-      const { error } = await supabaseClient
+      await supabaseClient
         .from("alerts")
         .upsert({
           id: 1,
-          location: locText,
-          direction: direction,
+          location: loc,
+          direction: document.getElementById("direction").value,
           time: new Date().toLocaleTimeString()
         });
 
-      if (error) {
-        alert("Error: " + error.message);
-      } else {
-        document.getElementById("msg").innerText =
-          "✅ Alert sent with current device location";
-      }
+      document.getElementById("msg").innerText =
+        "✅ Alert sent with GPS location";
     },
-    (err) => {
-      alert("Location permission denied or unavailable");
+    () => {
+      alert("Location permission denied. Please allow it in browser settings.");
     },
-    {
-      enableHighAccuracy: true
-    }
+    { enableHighAccuracy: true }
   );
 }
 </script>
 
 </body>
 </html>
- 
