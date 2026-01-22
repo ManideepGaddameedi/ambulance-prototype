@@ -26,9 +26,9 @@
       color:red;
       font-weight:bold;
       margin-top:10px;
-      font-size:16px;
     }
 
+    /* 🚑 Ambulance marker */
     .ambulance-box {
       width:64px; height:34px; background:white;
       border:2px solid red; border-radius:6px;
@@ -60,9 +60,7 @@
 <div class="box">
   <h2>🚦 Traffic Police Control</h2>
 
-  <button class="enable" onclick="enableSound()">
-    🔊 ENABLE ALERT SOUND
-  </button>
+  <button class="enable" onclick="enableSound()">🔊 ENABLE ALERT SOUND</button>
 
   <p class="alert-text" id="alertMsg"></p>
 
@@ -77,104 +75,34 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* 🔊 WEB AUDIO SIREN (GUARANTEED) */
-let audioCtx;
-let oscillator;
-let sirenInterval;
-let soundEnabled = false;
-let sirenOn = false;
+/* 🔊 Siren (Web Audio – works everywhere) */
+let audioCtx, oscillator, sirenInterval;
+let soundEnabled = false, sirenOn = false;
 
 function enableSound() {
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  alert("Sound enabled. Siren will play automatically.");
   soundEnabled = true;
+  alert("Alert sound enabled");
 }
 
 function startSiren() {
-  if (sirenOn) return;
+  if (sirenOn || !soundEnabled) return;
 
   oscillator = audioCtx.createOscillator();
-  oscillator.type = "sine";
-  oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
+  oscillator.frequency.value = 700;
   oscillator.connect(audioCtx.destination);
   oscillator.start();
 
-  let up = true;
+  let high = false;
   sirenInterval = setInterval(() => {
-    oscillator.frequency.setValueAtTime(
-      up ? 900 : 600,
-      audioCtx.currentTime
-    );
-    up = !up;
+    oscillator.frequency.value = high ? 900 : 600;
+    high = !high;
   }, 500);
 
   sirenOn = true;
 }
 
-function stopSiren() {
-  if (oscillator) oscillator.stop();
-  clearInterval(sirenInterval);
-  sirenOn = false;
-}
-
 /* 🔗 Supabase */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
-);
-
-/* 🗺 Map */
-let map = L.map("map").setView([17.385,78.4867],15);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
-  .addTo(map);
-
-const ambulanceIcon = L.divIcon({
-  className:"",
-  html:`<div class="ambulance-box">
-    <div class="light-left"></div>
-    <div class="light-right"></div>
-    <div class="ambulance-top">108</div>
-    <div class="ambulance-plus">+</div>
-  </div>`,
-  iconSize:[64,34], iconAnchor:[32,17]
-});
-
-let marker=null;
-
-async function updateData(){
-  const { data } = await supabaseClient
-    .from("alerts").select("*").eq("id",1).single();
-  if(!data) return;
-
-  /* 🚨 AUTO SIREN */
-  if (data.alert && soundEnabled) {
-    document.getElementById("alertMsg").innerText =
-      "🚨 EMERGENCY AMBULANCE APPROACHING";
-    startSiren();
-  }
-
-  /* 📍 LOCATION */
-  if (data.location) {
-    const [lat,lng] = data.location.split(",").map(Number);
-    if (!marker) {
-      marker = L.marker([lat,lng],{icon:ambulanceIcon}).addTo(map);
-      map.setView([lat,lng],16);
-    } else marker.setLatLng([lat,lng]);
-
-    const geo = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-    ).then(r=>r.json());
-
-    document.getElementById("loc").innerText =
-      geo.address.suburb ||
-      geo.address.neighbourhood ||
-      geo.address.city ||
-      "Unknown area";
-  }
-}
-
-setInterval(updateData,3000);
-</script>
-
-</body>
-</html>
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlub
