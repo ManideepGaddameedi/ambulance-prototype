@@ -1,76 +1,48 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Traffic Police Control</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <style>
-    body{font-family:Arial;background:#f4f6f9}
-    .box{
-      max-width:460px;margin:30px auto;background:#fff;
-      padding:15px;border-radius:10px;
-      box-shadow:0 4px 10px rgba(0,0,0,.25)
-    }
-    #map{height:320px;margin-top:10px;border-radius:8px}
-    .alert-text{color:red;font-weight:bold;margin-top:8px}
-  </style>
-</head>
 <body>
 
-<div class="box">
-  <h2>🚦 Traffic Police Control</h2>
+<h3 id="name">Waiting…</h3>
+<div id="map" style="height:300px"></div>
 
-  <p><b>Ambulance Location:</b><br>
-    <span id="loc">Waiting…</span>
-  </p>
-
-  <p class="alert-text" id="alertMsg"></p>
-
-  <div id="map"></div>
-</div>
-
+<link rel="stylesheet"
+ href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
+  "YOUR_ANON_KEY"
 );
 
-let map=L.map("map").setView([17.385,78.4867],15);
+let map = L.map("map").setView([17,78],10);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
-  .addTo(map);
+.addTo(map);
 
-let marker=null;
+let marker;
 
-async function updateData(){
-  const {data}=await supabaseClient
+async function fetchData() {
+  const { data } = await supabaseClient
     .from("alerts").select("*").eq("id",1).single();
-  if(!data) return;
 
-  if(data.location_name){
-    document.getElementById("loc").innerText=data.location_name;
-  }
+  if (!data) return;
 
-  if(data.latitude && data.longitude){
-    const pos=[data.latitude,data.longitude];
-    if(!marker){
-      marker=L.marker(pos).addTo(map);
-      map.setView(pos,16);
-    }else{
+  document.getElementById("name").innerText =
+    data.location_name;
+
+  if (data.latitude && data.longitude) {
+    const pos = [data.latitude, data.longitude];
+    if (!marker) {
+      marker = L.marker(pos).addTo(map);
+      map.setView(pos, 15);
+    } else {
       marker.setLatLng(pos);
     }
   }
-
-  if(data.alert){
-    document.getElementById("alertMsg").innerText =
-      "🚨 EMERGENCY AMBULANCE APPROACHING";
-  }
 }
 
-setInterval(updateData,3000);
+setInterval(fetchData, 2000);
 </script>
 
 </body>
