@@ -11,24 +11,66 @@
   />
 
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f9;
-    }
-    .box {
-      max-width: 430px;
-      margin: 30px auto;
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-    }
-    #map {
-      height: 320px;
-      margin-top: 10px;
-      border-radius: 8px;
-    }
-  </style>
+  .ambulance-box {
+    width: 64px;
+    height: 34px;
+    background: white;
+    border: 2px solid red;
+    border-radius: 6px;
+    position: relative;
+    font-family: Arial, sans-serif;
+    box-shadow: 0 0 8px rgba(0,0,0,0.4);
+  }
+
+  .ambulance-top {
+    font-size: 11px;
+    font-weight: bold;
+    color: red;
+    text-align: center;
+  }
+
+  .ambulance-plus {
+    font-size: 16px;
+    font-weight: bold;
+    color: red;
+    text-align: center;
+    line-height: 14px;
+  }
+
+  .ambulance-bottom {
+    font-size: 10px;
+    font-weight: bold;
+    text-align: center;
+  }
+
+  /* 🚨 Flashing lights */
+  .light-left, .light-right {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    position: absolute;
+    top: -5px;
+    animation: flash 1s infinite;
+  }
+
+  .light-left {
+    left: 8px;
+    background: red;
+  }
+
+  .light-right {
+    right: 8px;
+    background: blue;
+    animation-delay: 0.5s;
+  }
+
+  @keyframes flash {
+    0% { opacity: 1; }
+    50% { opacity: 0.2; }
+    100% { opacity: 1; }
+  }
+</style>
+
 </head>
 <body>
 
@@ -65,34 +107,19 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 
 /* 🚑 Ambulance icon */
 const ambulanceIcon = L.divIcon({
-  className: "ambulance-108-marker",
+  className: "",
   html: `
-    <div style="
-      width: 56px;
-      height: 44px;
-      background: white;
-      border: 2px solid red;
-      border-radius: 6px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-family: Arial, sans-serif;
-      box-shadow: 0 0 8px rgba(0,0,0,0.4);
-    ">
-      <div style="font-size:13px; font-weight:bold; color:red;">
-        108
-      </div>
-      <div style="font-size:18px; line-height:16px; color:red;">
-        +
-      </div>
-      <div style="font-size:10px; font-weight:bold; color:black;">
-        CMR
-      </div>
+    <div class="ambulance-box">
+      <div class="light-left"></div>
+      <div class="light-right"></div>
+
+      <div class="ambulance-top">108</div>
+      <div class="ambulance-plus">+</div>
+      <div class="ambulance-bottom">CMR</div>
     </div>
   `,
-  iconSize: [56, 44],
-  iconAnchor: [28, 22]
+  iconSize: [64, 34],
+  iconAnchor: [32, 17]
 });
 
 
