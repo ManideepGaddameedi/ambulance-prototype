@@ -4,54 +4,72 @@
   <title>Traffic Police Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <!-- Leaflet CSS -->
   <link rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
-    body { font-family: Arial; background:#f4f6f9; }
-    .box {
-      max-width:460px; margin:30px auto; background:#fff;
-      padding:15px; border-radius:10px;
-      box-shadow:0 4px 10px rgba(0,0,0,.25);
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
     }
-    #map { height:320px; margin-top:10px; border-radius:8px; }
-
-    .enable {
-      width:100%; padding:12px; font-size:16px;
-      font-weight:bold; background:green; color:white;
-      border:none; border-radius:6px; cursor:pointer;
+    .box {
+      max-width: 460px;
+      margin: 30px auto;
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    }
+    #map {
+      height: 320px;
+      margin-top: 10px;
+      border-radius: 8px;
     }
 
     .alert-text {
-      color:red;
-      font-weight:bold;
-      margin-top:10px;
+      color: red;
+      font-weight: bold;
+      margin-top: 8px;
+      font-size: 16px;
     }
 
-    /* 🚑 Ambulance marker */
+    /* 🚑 Animated ambulance */
     .ambulance-box {
-      width:64px; height:34px; background:white;
-      border:2px solid red; border-radius:6px;
-      position:relative;
+      width: 64px;
+      height: 34px;
+      background: white;
+      border: 2px solid red;
+      border-radius: 6px;
+      position: relative;
     }
     .ambulance-top {
-      font-size:12px; font-weight:bold;
-      color:red; text-align:center;
+      font-size: 12px;
+      font-weight: bold;
+      color: red;
+      text-align: center;
     }
     .ambulance-plus {
-      font-size:16px; font-weight:bold;
-      color:red; text-align:center;
+      font-size: 16px;
+      font-weight: bold;
+      color: red;
+      text-align: center;
     }
-    .light-left,.light-right {
-      width:6px;height:6px;border-radius:50%;
-      position:absolute;top:-5px;
-      animation:flash 1s infinite;
+    .light-left, .light-right {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      position: absolute;
+      top: -5px;
+      animation: flash 1s infinite;
     }
-    .light-left { left:10px; background:red; }
-    .light-right { right:10px; background:blue; animation-delay:.5s; }
+    .light-left { left: 10px; background: red; }
+    .light-right { right: 10px; background: blue; animation-delay: .5s; }
 
     @keyframes flash {
-      0%{opacity:1}50%{opacity:.2}100%{opacity:1}
+      0% { opacity: 1; }
+      50% { opacity: .2; }
+      100% { opacity: 1; }
     }
   </style>
 </head>
@@ -60,49 +78,79 @@
 <div class="box">
   <h2>🚦 Traffic Police Control</h2>
 
-  <button class="enable" onclick="enableSound()">🔊 ENABLE ALERT SOUND</button>
+  <p><b>Ambulance Location:</b><br>
+    <span id="loc">Waiting for ambulance…</span>
+  </p>
 
   <p class="alert-text" id="alertMsg"></p>
-
-  <p><b>Ambulance Location:</b><br>
-    <span id="loc">Waiting…</span>
-  </p>
 
   <div id="map"></div>
 </div>
 
+<!-- Leaflet -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* 🔊 Siren (Web Audio – works everywhere) */
-let audioCtx, oscillator, sirenInterval;
-let soundEnabled = false, sirenOn = false;
-
-function enableSound() {
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  soundEnabled = true;
-  alert("Alert sound enabled");
-}
-
-function startSiren() {
-  if (sirenOn || !soundEnabled) return;
-
-  oscillator = audioCtx.createOscillator();
-  oscillator.frequency.value = 700;
-  oscillator.connect(audioCtx.destination);
-  oscillator.start();
-
-  let high = false;
-  sirenInterval = setInterval(() => {
-    oscillator.frequency.value = high ? 900 : 600;
-    high = !high;
-  }, 500);
-
-  sirenOn = true;
-}
-
 /* 🔗 Supabase */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlub
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
+);
+
+/* 🗺 Map */
+let map = L.map("map").setView([17.385, 78.4867], 15);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
+  .addTo(map);
+
+/* 🚑 Marker */
+const ambulanceIcon = L.divIcon({
+  className: "",
+  html: `
+    <div class="ambulance-box">
+      <div class="light-left"></div>
+      <div class="light-right"></div>
+      <div class="ambulance-top">108</div>
+      <div class="ambulance-plus">+</div>
+    </div>
+  `,
+  iconSize: [64, 34],
+  iconAnchor: [32, 17]
+});
+
+let marker = null;
+
+/* 🔄 Fetch data (NO reverse geocoding here) */
+async function updateData() {
+  const { data } = await supabaseClient
+    .from("alerts")
+    .select("*")
+    .eq("id", 1)
+    .single();
+
+  if (!data) return;
+
+  /* 🚨 Emergency alert */
+  if (data.alert === true) {
+    document.getElementById("alertMsg").innerText =
+      "🚨 EMERGENCY AMBULANCE APPROACHING";
+  }
+
+  /* 📍 LOCATION NAME (DIRECT) */
+  if (data.location) {
+    document.getElementById("loc").innerText = data.location;
+
+    // Map just centers (no parsing)
+    if (!marker) {
+      marker = L.marker(map.getCenter(), { icon: ambulanceIcon }).addTo(map);
+    }
+  }
+}
+
+setInterval(updateData, 3000);
+</script>
+
+</body>
+</html>
