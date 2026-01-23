@@ -1,18 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Police Control</title>
-  <link rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <title>Traffic Police Control</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
 </head>
 <body>
 
 <h2>🚦 Traffic Police Control</h2>
-
-<p><b>Destination:</b> <span id="dname">--</span></p>
-<p><b>Distance:</b> <span id="dist">--</span> km</p>
-
-<div id="map" style="height:350px;"></div>
+<div id="map" style="height:400px;"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -20,77 +18,35 @@
 <script>
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "YOUR_ANON_KEY"
+  "PASTE_YOUR_ANON_KEY_HERE"
 );
 
-let map = L.map("map").setView([17,78],6);
+let map = L.map("map").setView([17, 78], 6);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
   .addTo(map);
 
-let ambMarker;
-let destLatLng = null;
-let lastDest = "";
-
-/* Distance formula */
-function distance(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = (lat2-lat1)*Math.PI/180;
-  const dLon = (lon2-lon1)*Math.PI/180;
-  const a =
-    Math.sin(dLat/2)**2 +
-    Math.cos(lat1*Math.PI/180) *
-    Math.cos(lat2*Math.PI/180) *
-    Math.sin(dLon/2)**2;
-  return (R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))).toFixed(2);
-}
+let marker = null;
 
 async function load() {
   const { data } = await supabaseClient
-    .from("alerts").select("*").eq("id",1).single();
+    .from("alerts")
+    .select("*")
+    .eq("id", 1)
+    .single();
 
   if (!data || !data.location) return;
 
-  const [lat,lng] = data.location.split(",").map(Number);
+  const [lat, lng] = data.location.split(",").map(Number);
 
-  /* Marker */
-  if (!ambMarker) {
-    ambMarker = L.marker([lat,lng]).addTo(map);
-    map.setView([lat,lng],15);
+  if (!marker) {
+    marker = L.marker([lat, lng]).addTo(map);
+    map.setView([lat, lng], 15);
   } else {
-    ambMarker.setLatLng([lat,lng]);
-  }
-
-  /* Destination name */
-  document.getElementById("dname").innerText =
-    data.destination || "--";
-
-  /* Convert destination name → lat/lng (ONLY ONCE) */
-  if (data.destination && data.destination !== lastDest) {
-    lastDest = data.destination;
-
-    const geo = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${data.destination}`
-    ).then(r=>r.json());
-
-    if (geo.length > 0) {
-      destLatLng = [
-        parseFloat(geo[0].lat),
-        parseFloat(geo[0].lon)
-      ];
-    }
-  }
-
-  /* Distance */
-  if (destLatLng) {
-    const d = distance(
-      lat, lng,
-      destLatLng[0], destLatLng[1]
-    );
-    document.getElementById("dist").innerText = d;
+    marker.setLatLng([lat, lng]);
   }
 }
 
-setInterval(load, 3000);
+setInterval(load, 2000);
 </script>
 
 </body>
