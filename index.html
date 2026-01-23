@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: Arial;
       background: #f4f6f9;
     }
     .box {
@@ -22,7 +22,6 @@
       padding: 12px;
       margin-top: 10px;
       font-size: 16px;
-      cursor: pointer;
     }
     input {
       width: 100%;
@@ -35,12 +34,9 @@
 
 <div class="box">
   <h2>🚑 Ambulance Device</h2>
-
-  <input type="text" id="location" placeholder="Tracking location..." readonly>
-
+  <input id="location" readonly placeholder="Live location..." />
   <button onclick="startTracking()">▶ START TRACKING</button>
   <button onclick="stopTracking()">⛔ STOP TRACKING</button>
-
   <p id="msg"></p>
 </div>
 
@@ -54,51 +50,26 @@ const supabaseClient = supabase.createClient(
 
 let watchId = null;
 
-// ▶ Start real-time tracking
 function startTracking() {
-  if (!navigator.geolocation) {
-    alert("Geolocation not supported");
-    return;
-  }
+  watchId = navigator.geolocation.watchPosition(async pos => {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    const loc = `${lat},${lng}`;
 
-  watchId = navigator.geolocation.watchPosition(
-    async (position) => {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      const locText = lat + "," + lng;
+    document.getElementById("location").value = loc;
 
-      document.getElementById("location").value = locText;
+    await supabaseClient
+      .from("alerts")
+      .update({ location: loc })
+      .eq("id", 1);
 
-      await supabaseClient
-        .from("alerts")
-        .upsert({
-          id: 1,
-          location: locText,
-          time: new Date().toLocaleTimeString()
-        });
-
-      document.getElementById("msg").innerText =
-        "📍 Tracking live location...";
-    },
-    () => {
-      alert("Location permission denied");
-    },
-    {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 5000
-    }
-  );
+    document.getElementById("msg").innerText = "📍 Tracking live…";
+  });
 }
 
-// ⛔ Stop tracking
 function stopTracking() {
-  if (watchId !== null) {
-    navigator.geolocation.clearWatch(watchId);
-    watchId = null;
-    document.getElementById("msg").innerText =
-      "⛔ Tracking stopped";
-  }
+  navigator.geolocation.clearWatch(watchId);
+  document.getElementById("msg").innerText = "⛔ Tracking stopped";
 }
 </script>
 
