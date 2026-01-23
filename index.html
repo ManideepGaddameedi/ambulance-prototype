@@ -4,29 +4,14 @@
   <title>Ambulance Device</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f9;
-    }
+    body { font-family: Arial; background:#f4f6f9; }
     .box {
-      max-width: 420px;
-      margin: 40px auto;
-      background: white;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      max-width:420px; margin:40px auto; background:#fff;
+      padding:20px; border-radius:10px;
+      box-shadow:0 4px 10px rgba(0,0,0,.2);
     }
-    button {
-      width: 100%;
-      padding: 12px;
-      margin-top: 10px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    .status {
-      margin-top: 8px;
-      font-weight: bold;
-    }
+    button { width:100%; padding:12px; margin-top:8px; font-size:16px; }
+    .status { font-weight:bold; margin-top:8px; }
   </style>
 </head>
 <body>
@@ -38,22 +23,23 @@
   <p class="status" id="sendStatus">Backend: Not sending</p>
 
   <h3>Select Destination Hospital</h3>
-
   <button onclick="selectHospital('Gandhi Hospital')">Gandhi Hospital</button>
   <button onclick="selectHospital('Apollo Hospital')">Apollo Hospital</button>
   <button onclick="selectHospital('Yashoda Hospital')">Yashoda Hospital</button>
 
-  <p><b>Selected Hospital:</b> <span id="selected">None</span></p>
+  <p><b>Selected:</b> <span id="selected">None</span></p>
 
   <button onclick="startTracking()">▶ START TRACKING</button>
 </div>
 
-<!-- Supabase SDK -->
+<!-- Supabase JS v2 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* ✅ SUPABASE CONFIG — ALREADY FILLED */
-const supabaseClient = supabase.createClient(
+/* ✅ CORRECT SUPABASE v2 INITIALIZATION */
+const { createClient } = supabase;
+
+const supabaseClient = createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
@@ -61,16 +47,14 @@ const supabaseClient = supabase.createClient(
 let selectedHospital = null;
 let watchId = null;
 
-/* 🏥 Select hospital */
 function selectHospital(name) {
   selectedHospital = name;
   document.getElementById("selected").innerText = name;
 }
 
-/* ▶ Start GPS tracking */
 function startTracking() {
   if (!selectedHospital) {
-    alert("Please select a hospital first");
+    alert("Select a hospital first");
     return;
   }
 
@@ -85,12 +69,12 @@ function startTracking() {
     "GPS: Requesting permission…";
 
   watchId = navigator.geolocation.watchPosition(
-    async (position) => {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
+    async (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
 
       document.getElementById("gpsStatus").innerText =
-        "GPS: Active (" + lat.toFixed(5) + ", " + lng.toFixed(5) + ")";
+        `GPS: Active (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
 
       const { error } = await supabaseClient
         .from("alerts")
@@ -101,19 +85,13 @@ function startTracking() {
         });
 
       document.getElementById("sendStatus").innerText =
-        error
-          ? "❌ Backend: Failed"
-          : "✅ Backend: Sent to police";
+        error ? "❌ Backend: Failed" : "✅ Backend: Sent to police";
     },
     () => {
       document.getElementById("gpsStatus").innerText =
         "❌ GPS permission denied";
     },
-    {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 10000
-    }
+    { enableHighAccuracy: true }
   );
 }
 </script>
