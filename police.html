@@ -6,7 +6,7 @@
 
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: Arial;
       background: #f4f6f9;
     }
     .box {
@@ -23,6 +23,10 @@
       border: 0;
       margin-top: 15px;
     }
+    .status {
+      font-size: 14px;
+      color: #555;
+    }
   </style>
 </head>
 <body>
@@ -30,10 +34,9 @@
 <div class="box">
   <h2>🚦 Traffic Police Control</h2>
 
-  <p>
-    <b>Ambulance Location:</b><br>
-    <span id="loc">Waiting...</span>
-  </p>
+  <p><b>Ambulance Location:</b></p>
+  <p id="loc">Waiting...</p>
+  <p class="status" id="status">Connecting to server...</p>
 
   <iframe id="map"></iframe>
 </div>
@@ -55,10 +58,20 @@ async function loadLocation() {
     .eq("id", 1)
     .single();
 
-  if (error || !data || !data.location) return;
+  if (error) {
+    document.getElementById("status").innerText = "❌ DB Error";
+    console.error("Supabase error:", error);
+    return;
+  }
+
+  if (!data || !data.location) {
+    document.getElementById("status").innerText = "⏳ No location yet";
+    return;
+  }
 
   const location = data.location.replace(/\s/g, "");
   document.getElementById("loc").innerText = location;
+  document.getElementById("status").innerText = "✅ Live tracking";
 
   if (location !== lastLocation) {
     document.getElementById("map").src =
