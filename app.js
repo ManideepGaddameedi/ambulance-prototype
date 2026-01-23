@@ -1,10 +1,8 @@
 let map;
 let ambulanceMarker, hospitalMarker, routeLayer;
-let routePoints = [];
-let routeIndex = 0;
-let moving = false;
+let lastLatLng = null;
 
-/* ================= CUSTOM AMBULANCE ICON ================= */
+/* ================= AMBULANCE ICON ================= */
 const ambulanceIcon = L.divIcon({
     html: "🚑",
     className: "ambulance-icon",
@@ -47,6 +45,24 @@ function findNearestHospital(lat, lng) {
     return nearest;
 }
 
+/* ================= SMOOTH GPS MOVE ================= */
+function smoothMove(marker, from, to) {
+    const steps = 10;
+    let step = 0;
+
+    const latStep = (to[0] - from[0]) / steps;
+    const lngStep = (to[1] - from[1]) / steps;
+
+    const interval = setInterval(() => {
+        step++;
+        marker.setLatLng([
+            from[0] + latStep * step,
+            from[1] + lngStep * step
+        ]);
+        if (step === steps) clearInterval(interval);
+    }, 100);
+}
+
 /* ================= AMBULANCE SIDE ================= */
 function initAmbulanceMap() {
     map = L.map("map").setView([17.3850, 78.4867], 13);
@@ -61,9 +77,9 @@ function startTracking() {
     const status = document.getElementById("status");
 
     status.className = "status active";
-    status.innerText = "Status: Calculating route...";
+    status.innerText = "Status: Tracking live GPS...";
 
-    navigator.geolocation.getCurrentPosition(async pos => {
+    navigator.geolocation.watchPosition(async pos => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
 
@@ -71,73 +87,63 @@ function startTracking() {
         const km = distance(lat, lng, hospital.lat, hospital.lng);
         const eta = (km / 40 * 60).toFixed(1);
 
+        /* CREATE MARKER FIRST TIME */
+        if (!ambulanceMarker) {
+            ambulanceMarker = L.marker([lat, lng], {
+                icon: ambulanceIcon
+            }).addTo(map);
+
+            hospitalMarker = L.marker([hospital.lat, hospital.lng])
+                .addTo(map)
+                .bindPopup("🏥 " + hospital.name);
+
+            // DRAW ROUTE ONCE
+            const url =
+                `https://router.project-osrm.org/route/v1/driving/` +
+                `${lng},${lat};${hospital.lng},${hospital.lat}` +
+                `?overview=full&geometries=geojson`;
+
+            const res = await fetch(url);
+            const json = await res.json();
+
+            const routePoints =
+                json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+
+            routeLayer = L.polyline(routePoints, {
+                color: "red",
+                weight: 5
+            }).addTo(map);
+
+            map.fitBounds(routeLayer.getBounds());
+
+            lastLatLng = [lat, lng];
+        } else {
+            // MOVE BASED ON REAL GPS
+            smoothMove(ambulanceMarker, lastLatLng, [lat, lng]);
+            lastLatLng = [lat, lng];
+        }
+
+        /* SHARE DATA FOR POLICE */
+        localStorage.setItem("AMB_DATA", JSON.stringify({
+            id,
+            lat,
+            lng,
+            hospital,
+            distance: km.toFixed(2),
+            eta,
+            time: new Date().toLocaleTimeString()
+        }));
+
         status.innerHTML =
             `Status: Emergency Active<br>
              Destination: ${hospital.name}<br>
              Distance: ${km.toFixed(2)} km<br>
-             ETA: ${eta} minutes`;
-
-        // AMBULANCE ICON (VISIBLE)
-        ambulanceMarker = L.marker([lat, lng], {
-            icon: ambulanceIcon
-        }).addTo(map);
-
-        hospitalMarker = L.marker([hospital.lat, hospital.lng])
-            .addTo(map)
-            .bindPopup("🏥 " + hospital.name);
-
-        // GET ROUTE
-        const url =
-            `https://router.project-osrm.org/route/v1/driving/` +
-            `${lng},${lat};${hospital.lng},${hospital.lat}` +
-            `?overview=full&geometries=geojson`;
-
-        const res = await fetch(url);
-        const json = await res.json();
-
-        routePoints =
-            json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-
-        routeIndex = 0;
-
-        routeLayer = L.polyline(routePoints, {
-            color: "red",
-            weight: 5
-        }).addTo(map);
-
-        map.fitBounds(routeLayer.getBounds());
-
-        localStorage.setItem("AMB_DATA", JSON.stringify({
-            id,
-            hospital,
-            distance: km.toFixed(2),
-            eta,
-            route: routePoints
-        }));
-
-        moving = true;
-        moveAlongRoute();
+             ETA: ${eta} min`;
 
     }, () => alert("Location permission denied"), {
-        enableHighAccuracy: true
+        enableHighAccuracy: true,
+        maximumAge: 0
     });
-}
-
-/* ================= MOVE ALONG ROUTE ================= */
-function moveAlongRoute() {
-    if (!moving || routeIndex >= routePoints.length) return;
-
-    const point = routePoints[routeIndex];
-    ambulanceMarker.setLatLng(point);
-
-    const stored = JSON.parse(localStorage.getItem("AMB_DATA"));
-    stored.lat = point[0];
-    stored.lng = point[1];
-    stored.time = new Date().toLocaleTimeString();
-    localStorage.setItem("AMB_DATA", JSON.stringify(stored));
-
-    routeIndex++;
-    setTimeout(moveAlongRoute, 300); // speed control
 }
 
 /* ================= POLICE SIDE ================= */
@@ -176,13 +182,5 @@ function updatePoliceMap() {
         hospitalMarker = L.marker([data.hospital.lat, data.hospital.lng])
             .addTo(map)
             .bindPopup("🏥 " + data.hospital.name);
-    }
-
-    if (!routeLayer && data.route) {
-        routeLayer = L.polyline(data.route, {
-            color: "red",
-            weight: 5
-        }).addTo(map);
-        map.fitBounds(routeLayer.getBounds());
     }
 }
