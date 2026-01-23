@@ -32,14 +32,12 @@
   <button onclick="startTracking()">▶ START TRACKING</button>
 </div>
 
-<!-- Supabase JS v2 -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- ✅ SUPABASE JS v1 (STABLE) -->
+<script src="https://unpkg.com/@supabase/supabase-js@1.35.7"></script>
 
 <script>
-/* ✅ CORRECT SUPABASE v2 INITIALIZATION */
-const { createClient } = supabase;
-
-const supabaseClient = createClient(
+/* ✅ SUPABASE v1 CLIENT */
+const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
