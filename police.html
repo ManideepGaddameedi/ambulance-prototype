@@ -30,7 +30,7 @@
 
 <div class="box">
   <h2>🚦 Traffic Police Control</h2>
-  <p><b>Live Ambulance Route</b></p>
+  <p><b>Ambulance → Destination Route</b></p>
   <div id="map"></div>
 </div>
 
@@ -46,9 +46,9 @@ const supabaseClient = supabase.createClient(
 let map = L.map("map").setView([17.385, 78.486], 14);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-let ambulanceMarker, destMarker, routeLine;
+let ambMarker, destMarker, routeLine;
 
-async function update() {
+async function updateRoute() {
   const { data } = await supabaseClient
     .from("alerts")
     .select("location, destination")
@@ -60,18 +60,23 @@ async function update() {
   const [alat, alng] = data.location.split(",").map(Number);
   const [dlat, dlng] = data.destination.split(",").map(Number);
 
-  if (!ambulanceMarker) {
-    ambulanceMarker = L.marker([alat, alng]).addTo(map);
-    destMarker = L.marker([dlat, dlng]).addTo(map).bindPopup("🏥 Destination");
-    routeLine = L.polyline([[alat, alng], [dlat, dlng]], { color: "red" }).addTo(map);
+  if (!ambMarker) {
+    ambMarker = L.marker([alat, alng]).addTo(map);
+    destMarker = L.marker([dlat, dlng]).addTo(map)
+      .bindPopup("🏥 Destination");
+    routeLine = L.polyline(
+      [[alat, alng], [dlat, dlng]],
+      { color: "red", weight: 4 }
+    ).addTo(map);
+
     map.fitBounds(routeLine.getBounds());
   } else {
-    ambulanceMarker.setLatLng([alat, alng]);
+    ambMarker.setLatLng([alat, alng]);
     routeLine.setLatLngs([[alat, alng], [dlat, dlng]]);
   }
 }
 
-setInterval(update, 3000);
+setInterval(updateRoute, 3000);
 </script>
 
 </body>
