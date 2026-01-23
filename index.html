@@ -32,15 +32,13 @@
   <button onclick="startTracking()">▶ START TRACKING</button>
 </div>
 
-<!-- ✅ SUPABASE JS v1 (STABLE) -->
-<script src="https://unpkg.com/@supabase/supabase-js@1.35.7"></script>
-
 <script>
-/* ✅ SUPABASE v1 CLIENT */
-const supabaseClient = supabase.createClient(
-  "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
-);
+/* 🔑 SUPABASE REST CONFIG */
+const SUPABASE_URL =
+  "https://inlkqessbewmxmtfvzfe.supabase.co/rest/v1/alerts";
+
+const SUPABASE_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I";
 
 let selectedHospital = null;
 let watchId = null;
@@ -52,7 +50,7 @@ function selectHospital(name) {
 
 function startTracking() {
   if (!selectedHospital) {
-    alert("Select a hospital first");
+    alert("Select hospital first");
     return;
   }
 
@@ -60,11 +58,6 @@ function startTracking() {
     alert("Geolocation not supported");
     return;
   }
-
-  if (watchId !== null) return;
-
-  document.getElementById("gpsStatus").innerText =
-    "GPS: Requesting permission…";
 
   watchId = navigator.geolocation.watchPosition(
     async (pos) => {
@@ -74,16 +67,30 @@ function startTracking() {
       document.getElementById("gpsStatus").innerText =
         `GPS: Active (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
 
-      const { error } = await supabaseClient
-        .from("alerts")
-        .upsert({
-          id: 1,
-          location: lat + "," + lng,
-          hospital: selectedHospital
+      try {
+        const res = await fetch(SUPABASE_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": SUPABASE_KEY,
+            "Authorization": "Bearer " + SUPABASE_KEY,
+            "Prefer": "resolution=merge-duplicates"
+          },
+          body: JSON.stringify({
+            id: 1,
+            location: lat + "," + lng,
+            hospital: selectedHospital
+          })
         });
 
-      document.getElementById("sendStatus").innerText =
-        error ? "❌ Backend: Failed" : "✅ Backend: Sent to police";
+        document.getElementById("sendStatus").innerText =
+          res.ok
+            ? "✅ Backend: Sent to police"
+            : "❌ Backend failed (" + res.status + ")";
+      } catch (e) {
+        document.getElementById("sendStatus").innerText =
+          "❌ Network error";
+      }
     },
     () => {
       document.getElementById("gpsStatus").innerText =
