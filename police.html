@@ -35,13 +35,7 @@
     <span id="loc">Waiting...</span>
   </p>
 
-  <!-- ✅ FIXED IFRAME -->
-  <iframe
-    id="map"
-    loading="lazy"
-    referrerpolicy="no-referrer-when-downgrade"
-    allowfullscreen>
-  </iframe>
+  <iframe id="map"></iframe>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -55,28 +49,25 @@ const supabaseClient = supabase.createClient(
 let lastLocation = "";
 
 async function loadLocation() {
-  const { data } = await supabaseClient
+  const { data, error } = await supabaseClient
     .from("alerts")
-    .select("*")
+    .select("location")
     .eq("id", 1)
     .single();
 
-  if (!data || !data.location) return;
+  if (error || !data || !data.location) return;
 
-  // Ensure clean format "lat,lng"
   const location = data.location.replace(/\s/g, "");
-
   document.getElementById("loc").innerText = location;
 
   if (location !== lastLocation) {
     document.getElementById("map").src =
-      `https://www.google.com/maps?q=${location}&z=16&output=embed`;
-
+      `https://maps.google.com/maps?q=${location}&z=16&output=embed`;
     lastLocation = location;
   }
 }
 
-// Update every 3 seconds
+loadLocation();
 setInterval(loadLocation, 3000);
 </script>
 
