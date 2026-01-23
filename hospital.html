@@ -1,52 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Hospital Dashboard</title>
+  <title>Hospital Page</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f9;
-    }
-
+    body { font-family: Arial; background:#f4f6f9; }
     .box {
-      max-width: 420px;
-      margin: 40px auto;
-      background: #ffffff;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      max-width:420px; margin:40px auto; background:#fff;
+      padding:20px; border-radius:10px;
+      box-shadow:0 4px 10px rgba(0,0,0,.2);
     }
-
-    h2 {
-      text-align: center;
-    }
-
-    .status {
-      margin: 10px 0;
-      font-size: 16px;
-    }
-
-    button {
-      width: 100%;
-      padding: 12px;
-      margin-top: 10px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-
-    .yes {
-      background: green;
-      color: white;
-      border: none;
-    }
-
-    .no {
-      background: red;
-      color: white;
-      border: none;
-    }
+    button { width:100%; padding:12px; margin-top:8px; font-size:16px; }
   </style>
 </head>
 <body>
@@ -54,77 +18,44 @@
 <div class="box">
   <h2>🏥 Hospital Dashboard</h2>
 
-  <div class="status">
-    <b>Ambulance Status:</b><br>
-    <span id="ambStatus">Waiting for ambulance alert…</span>
-  </div>
-
-  <div class="status">
-    <b>Current Location:</b><br>
-    <span id="location">--</span>
-  </div>
-
-  <div class="status">
-    <b>Estimated Arrival:</b><br>
-    <span id="eta">--</span>
-  </div>
+  <p><b>Status:</b> <span id="status">Waiting…</span></p>
+  <p><b>Location:</b> <span id="loc">--</span></p>
+  <p><b>ETA:</b> <span id="eta">--</span> min</p>
 
   <hr>
 
-  <h3>Bed Availability</h3>
+  <button onclick="updateBed('YES')">✅ Bed Available</button>
+  <button onclick="updateBed('NO')">❌ Bed Not Available</button>
 
-  <button class="yes" onclick="updateBedStatus('YES')">
-    ✅ Bed Available
-  </button>
-
-  <button class="no" onclick="updateBedStatus('NO')">
-    ❌ Bed Not Available
-  </button>
-
-  <p class="status" id="bedMsg"></p>
+  <p id="msg"></p>
 </div>
 
 <script>
-/* 🔄 Fetch ambulance data every 3 seconds */
-async function fetchAmbulanceData() {
-  try {
-    const res = await fetch("/get_status");
-    const data = await res.json();
+const BACKEND = "https://ambulance-backend.onrender.com";
 
-    if (!data || !data.latitude) {
-      document.getElementById("ambStatus").innerText =
-        "Waiting for ambulance alert…";
-      return;
-    }
+async function fetchData() {
+  const res = await fetch(`${BACKEND}/get_status`);
+  const data = await res.json();
+  if (!data.latitude) return;
 
-    document.getElementById("ambStatus").innerText =
-      "🚑 Ambulance is on the way";
-
-    document.getElementById("location").innerText =
-      data.latitude.toFixed(5) + ", " + data.longitude.toFixed(5);
-
-    document.getElementById("eta").innerText =
-      data.eta + " minutes";
-
-  } catch (e) {
-    console.log("Error fetching data");
-  }
+  document.getElementById("status").innerText = "Ambulance Incoming";
+  document.getElementById("loc").innerText =
+    data.latitude.toFixed(5) + ", " + data.longitude.toFixed(5);
+  document.getElementById("eta").innerText = data.eta;
 }
 
-/* 🏥 Update bed availability */
-async function updateBedStatus(status) {
-  await fetch("/update_bed", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ bed: status })
+function updateBed(val) {
+  fetch(`${BACKEND}/update_bed`, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ bed: val })
   });
 
-  document.getElementById("bedMsg").innerText =
-    "Bed status updated: " + status;
+  document.getElementById("msg").innerText =
+    "Bed status updated: " + val;
 }
 
-/* Auto refresh */
-setInterval(fetchAmbulanceData, 3000);
+setInterval(fetchData, 3000);
 </script>
 
 </body>
