@@ -4,30 +4,29 @@
   <title>Traffic Police Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
   <style>
     body {
-      font-family: Arial;
+      font-family: Arial, sans-serif;
       background: #f4f6f9;
     }
-
     .box {
-      max-width: 480px;
+      max-width: 500px;
       margin: 30px auto;
       background: white;
       padding: 15px;
       border-radius: 10px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.25);
     }
-
     #map {
-      height: 400px;
+      height: 420px;
       margin-top: 10px;
       border-radius: 8px;
     }
 
-    /* 🚑 Rotating icon wrapper */
+    /* 🚑 Rotating ambulance icon */
     .ambulance-icon {
       width: 48px;
       height: 48px;
@@ -42,7 +41,7 @@
 
 <div class="box">
   <h2>🚦 Traffic Police Control</h2>
-  <p>Live Ambulance Tracking</p>
+  <p>Live Ambulance Route Tracking</p>
   <div id="map"></div>
 </div>
 
@@ -68,11 +67,14 @@ const ambulanceIcon = L.divIcon({
   iconAnchor: [24, 24]
 });
 
-let marker = null;
+let ambMarker = null;
+let destMarker = null;
+let routeLine = null;
+
 let lastPos = null;
 let animationTimer = null;
 
-/* 🧭 Calculate bearing angle */
+/* 🧭 Bearing calculation */
 function getBearing(from, to) {
   const lat1 = from[0] * Math.PI / 180;
   const lat2 = to[0] * Math.PI / 180;
@@ -83,17 +85,16 @@ function getBearing(from, to) {
     Math.cos(lat1) * Math.sin(lat2) -
     Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
 
-  let brng = Math.atan2(y, x) * 180 / Math.PI;
-  return (brng + 360) % 360;
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
 /* 🚑 Smooth move + rotate */
 function moveSmooth(from, to) {
   if (animationTimer) clearInterval(animationTimer);
 
-  const bearing = getBearing(from, to);
+  const angle = getBearing(from, to);
   const iconEl = document.getElementById("ambIcon");
-  if (iconEl) iconEl.style.transform = `rotate(${bearing}deg)`;
+  if (iconEl) iconEl.style.transform = `rotate(${angle}deg)`;
 
   let step = 0;
   const steps = 20;
@@ -102,38 +103,68 @@ function moveSmooth(from, to) {
 
   animationTimer = setInterval(() => {
     step++;
-    marker.setLatLng([
+    ambMarker.setLatLng([
       from[0] + latStep * step,
       from[1] + lngStep * step
     ]);
-
     if (step >= steps) clearInterval(animationTimer);
   }, 100);
 }
 
-/* 🔄 Fetch GPS */
+/* 🔄 Main update */
 async function update() {
   const { data } = await supabaseClient
     .from("alerts")
-    .select("location")
+    .select("location, destination, destination_name")
     .eq("id", 1)
     .single();
 
-  if (!data || !data.location) return;
+  if (!data || !data.location || !data.destination) return;
 
-  const current = data.location.split(",").map(Number);
+  const [alat, alng] = data.location.split(",").map(Number);
+  const [dlat, dlng] = data.destination.split(",").map(Number);
+  const current = [alat, alng];
 
-  if (!marker) {
-    marker = L.marker(current, { icon: ambulanceIcon }).addTo(map);
+  /* 🚑 Ambulance marker */
+  if (!ambMarker) {
+    ambMarker = L.marker(current, { icon: ambulanceIcon }).addTo(map);
     lastPos = current;
     map.setView(current, 15);
   } else {
     moveSmooth(lastPos, current);
     lastPos = current;
   }
+
+  /* 🏥 Destination marker */
+  if (!destMarker) {
+    destMarker = L.marker([dlat, dlng])
+      .addTo(map)
+      .bindPopup("🏥 " + (data.destination_name || "Destination"));
+  }
+
+  /* 🛣️ OSRM road route */
+  const url =
+    `https://router.project-osrm.org/route/v1/driving/` +
+    `${alng},${alat};${dlng},${dlat}?overview=full&geometries=geojson`;
+
+  const res = await fetch(url);
+  const json = await res.json();
+  if (!json.routes || !json.routes.length) return;
+
+  const coords = json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+
+  if (routeLine) {
+    routeLine.setLatLngs(coords);
+  } else {
+    routeLine = L.polyline(coords, {
+      color: "red",
+      weight: 5
+    }).addTo(map);
+    map.fitBounds(routeLine.getBounds());
+  }
 }
 
-/* Update every 3 seconds */
+/* Refresh every 3 seconds */
 setInterval(update, 3000);
 </script>
 
