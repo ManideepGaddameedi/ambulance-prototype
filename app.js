@@ -4,6 +4,14 @@ let routePoints = [];
 let routeIndex = 0;
 let moving = false;
 
+/* ================= CUSTOM AMBULANCE ICON ================= */
+const ambulanceIcon = L.divIcon({
+    html: "🚑",
+    className: "ambulance-icon",
+    iconSize: [40, 40],
+    iconAnchor: [20, 20]
+});
+
 /* ================= HOSPITAL DATA ================= */
 const hospitals = [
     { name: "Apollo Hospital", lat: 17.4108, lng: 78.3983 },
@@ -69,11 +77,16 @@ function startTracking() {
              Distance: ${km.toFixed(2)} km<br>
              ETA: ${eta} minutes`;
 
-        ambulanceMarker = L.marker([lat, lng]).addTo(map);
+        // AMBULANCE ICON (VISIBLE)
+        ambulanceMarker = L.marker([lat, lng], {
+            icon: ambulanceIcon
+        }).addTo(map);
+
         hospitalMarker = L.marker([hospital.lat, hospital.lng])
             .addTo(map)
             .bindPopup("🏥 " + hospital.name);
 
+        // GET ROUTE
         const url =
             `https://router.project-osrm.org/route/v1/driving/` +
             `${lng},${lat};${hospital.lng},${hospital.lat}` +
@@ -124,7 +137,7 @@ function moveAlongRoute() {
     localStorage.setItem("AMB_DATA", JSON.stringify(stored));
 
     routeIndex++;
-    setTimeout(moveAlongRoute, 300);
+    setTimeout(moveAlongRoute, 300); // speed control
 }
 
 /* ================= POLICE SIDE ================= */
@@ -152,7 +165,9 @@ function updatePoliceMap() {
          <b>Updated:</b> ${data.time}`;
 
     if (!ambulanceMarker) {
-        ambulanceMarker = L.marker([data.lat, data.lng]).addTo(map);
+        ambulanceMarker = L.marker([data.lat, data.lng], {
+            icon: ambulanceIcon
+        }).addTo(map);
     } else {
         ambulanceMarker.setLatLng([data.lat, data.lng]);
     }
