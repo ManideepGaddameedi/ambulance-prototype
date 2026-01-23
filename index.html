@@ -6,7 +6,7 @@
 
   <style>
     body {
-      font-family: Arial;
+      font-family: Arial, sans-serif;
       background: #f4f6f9;
     }
     .box {
@@ -18,11 +18,16 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
       text-align: center;
     }
-    input, button {
+    input, select, button {
       width: 100%;
       padding: 10px;
       margin-top: 10px;
       font-size: 16px;
+    }
+    .status {
+      margin-top: 10px;
+      font-size: 14px;
+      color: green;
     }
   </style>
 </head>
@@ -31,18 +36,39 @@
 <div class="box">
   <h2>🚑 Ambulance Device</h2>
 
-  <input id="destName" placeholder="Destination name (e.g. Gandhi Hospital)" />
-  <input id="location" placeholder="Live location..." readonly />
+  <!-- Ambulance ID -->
+  <select id="ambulanceId">
+    <option value="A1">Ambulance A1</option>
+    <option value="A2">Ambulance A2</option>
+    <option value="A3">Ambulance A3</option>
+  </select>
+
+  <!-- Icon -->
+  <select id="icon">
+    <option value="ambulance1.png">Red Ambulance</option>
+    <option value="ambulance2.png">Blue Ambulance</option>
+    <option value="ambulance3.png">Green Ambulance</option>
+  </select>
+
+  <!-- Destination name -->
+  <input
+    id="destinationName"
+    placeholder="Destination (e.g. Gandhi Hospital Hyderabad)"
+  >
+
+  <!-- Live GPS -->
+  <input id="location" placeholder="Live GPS location…" readonly>
 
   <button onclick="startTracking()">▶ START TRACKING</button>
   <button onclick="stopTracking()">⛔ STOP TRACKING</button>
 
-  <p id="msg"></p>
+  <div class="status" id="status"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
+/* 🔗 Supabase */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
@@ -51,30 +77,8 @@ const supabaseClient = supabase.createClient(
 let watchId = null;
 let destinationLatLng = null;
 
-/* ✅ ADDED: 10 ambulance numbers */
-const ambulanceNumbers = [
-  "AP26AB1234",
-  "AP26CD5678",
-  "AP26EF9012",
-  "AP26GH3456",
-  "AP26IJ7890",
-  "TG09XY1111",
-  "TG09XY2222",
-  "TG09XY3333",
-  "TG09XY4444",
-  "TG09XY5555"
-];
-
-/* ✅ ADDED: Ask which ambulance is starting */
-const ambulanceId = prompt(
-  "Enter Ambulance Vehicle Number:\n" + ambulanceNumbers.join("\n")
-);
-
-document.getElementById("msg").innerText =
-  "Ambulance Vehicle ID: " + ambulanceId;
-
-/* Convert destination name → lat,lng */
-async function getCoordinates(place) {
+/* 🌍 Convert destination name → lat,lng */
+async function geocode(place) {
   const res = await fetch(
     `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}`,
     { headers: { "User-Agent": "SmartAmbulanceSystem/1.0" } }
@@ -84,42 +88,54 @@ async function getCoordinates(place) {
   return `${data[0].lat},${data[0].lon}`;
 }
 
+/* ▶ Start tracking */
 async function startTracking() {
-  const place = document.getElementById("destName").value.trim();
-  if (!place) {
+  const ambulanceId = document.getElementById("ambulanceId").value;
+  const icon = document.getElementById("icon").value;
+  const destName = document.getElementById("destinationName").value.trim();
+
+  if (!destName) {
     alert("Enter destination name");
     return;
   }
 
-  destinationLatLng = await getCoordinates(place);
+  destinationLatLng = await geocode(destName);
   if (!destinationLatLng) {
     alert("Destination not found");
     return;
   }
 
-  document.getElementById("msg").innerText =
-    "📍 Destination set: " + place;
+  document.getElementById("status").innerText =
+    "Destination set: " + destName;
 
-  watchId = navigator.geolocation.watchPosition(async pos => {
-    const loc = `${pos.coords.latitude},${pos.coords.longitude}`;
-    document.getElementById("location").value = loc;
+  watchId = navigator.geolocation.watchPosition(
+    async pos => {
+      const loc = `${pos.coords.latitude},${pos.coords.longitude}`;
+      document.getElementById("location").value = loc;
 
-    await supabaseClient
-      .from("alerts")
-      .upsert({
-        // ❌ old: id: 1
-        // ✅ ADDED:
-        id: ambulanceId,
-        location: loc,
-        destination: destinationLatLng,
-        destination_name: place
-      });
-  });
+      await supabaseClient
+        .from("alerts")
+        .upsert({
+          ambulance_id: ambulanceId,
+          location: loc,
+          destination: destinationLatLng,
+          destination_name: destName,
+          icon: icon
+        });
+    },
+    () => alert("GPS permission denied"),
+    { enableHighAccuracy: true }
+  );
 }
 
+/* ⛔ Stop tracking */
 function stopTracking() {
-  navigator.geolocation.clearWatch(watchId);
-  document.getElementById("msg").innerText = "⛔ Tracking stopped";
+  if (watchId) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    document.getElementById("status").innerText =
+      "Tracking stopped";
+  }
 }
 </script>
 
