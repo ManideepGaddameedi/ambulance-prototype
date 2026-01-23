@@ -1,31 +1,105 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Ambulance Live Tracking</title>
+  <title>Ambulance Device</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet"
-          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <!-- Leaflet -->
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="app.js" defer></script>
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body { font-family: Arial; background:#f4f6f9; }
+    .box {
+      max-width: 420px;
+      margin: 20px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+    button { width:100%; padding:12px; margin-top:10px; }
+    input { width:100%; padding:8px; margin-top:10px; }
+    #map { height: 60vh; margin-top:10px; }
+  </style>
 </head>
+<body>
 
-<body onload="initAmbulanceMap()">
+<div class="box">
+  <h2>🚑 Ambulance Device</h2>
 
-<div class="container">
-    <h1>🚑 Ambulance Dashboard</h1>
-
-    <label>Ambulance ID</label>
-    <input type="text" id="ambulanceId" value="AMB-01">
-
-    <button onclick="startTracking()">🚨 Start Emergency</button>
-
-    <p id="status" class="status idle">Status: Waiting</p>
+  <input type="text" id="location" readonly>
+  <button onclick="startTracking()">▶ START TRACKING</button>
+  <button onclick="stopTracking()">⛔ STOP TRACKING</button>
+  <p id="msg"></p>
 </div>
 
 <div id="map"></div>
+
+<script>
+/* ================= SUPABASE ================= */
+const supabaseClient = supabase.createClient(
+  "https://inlkqessbewmxmtfvzfe.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
+);
+
+let watchId = null;
+let map, ambulanceMarker, lastLatLng = null;
+
+/* 🚑 ICON */
+const ambulanceIcon = L.divIcon({
+  html: "🚑",
+  iconSize: [40,40],
+  iconAnchor: [20,20]
+});
+
+/* MAP INIT */
+map = L.map("map").setView([17.3850, 78.4867], 13);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution:"© OpenStreetMap"
+}).addTo(map);
+
+/* ▶ START TRACKING (REAL GPS) */
+function startTracking() {
+  watchId = navigator.geolocation.watchPosition(async pos => {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+
+    document.getElementById("location").value = lat + "," + lng;
+
+    /* MOVE ICON ONLY WHEN GPS MOVES */
+    if (!ambulanceMarker) {
+      ambulanceMarker = L.marker([lat,lng], {icon: ambulanceIcon}).addTo(map);
+      map.setView([lat,lng], 16);
+      lastLatLng = [lat,lng];
+    } else {
+      ambulanceMarker.setLatLng([lat,lng]);
+      lastLatLng = [lat,lng];
+    }
+
+    /* SEND TO SUPABASE */
+    await supabaseClient.from("alerts").upsert({
+      id: 1,
+      lat, lng,
+      time: new Date().toLocaleTimeString()
+    });
+
+    document.getElementById("msg").innerText = "📍 Live tracking…";
+
+  }, () => alert("GPS denied"), { enableHighAccuracy:true });
+}
+
+/* ⛔ STOP */
+function stopTracking() {
+  navigator.geolocation.clearWatch(watchId);
+  document.getElementById("msg").innerText = "⛔ Tracking stopped";
+}
+</script>
 
 </body>
 </html>
