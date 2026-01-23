@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Traffic Police Dashboard</title>
+  <title>Traffic Police Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link
-    rel="stylesheet"
+  <link rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     body { font-family: Arial; background:#f4f6f9; }
@@ -12,8 +11,8 @@
       max-width:460px; margin:20px auto; background:#fff;
       padding:15px; border-radius:10px;
     }
-    #map { height:350px; margin-top:10px; }
-    .status { font-weight:bold; color:#555; }
+    #map { height:360px; margin-top:10px; }
+    .status { font-weight:bold; }
   </style>
 </head>
 <body>
@@ -33,20 +32,22 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* 🔗 SUPABASE */
-const supabaseClient = supabase.createClient(
-  "https://YOUR_PROJECT.supabase.co",
-  "YOUR_ANON_KEY"
+/* ✅ CORRECT SUPABASE v2 */
+const { createClient } = supabase;
+
+const supabaseClient = createClient(
+  "https://inlkqessbewmxmtfvzfe.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-/* 🏥 HOSPITAL LIST (MUST MATCH AMBULANCE SIDE EXACTLY) */
+/* SAME HOSPITAL LIST AS AMBULANCE */
 const hospitals = {
   "Gandhi Hospital": [17.4239, 78.5019],
   "Apollo Hospital": [17.4065, 78.4772],
   "Yashoda Hospital": [17.4422, 78.4664]
 };
 
-/* 🗺 MAP INIT */
+/* MAP */
 const map = L.map("map").setView([17.385, 78.4867], 12);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
   .addTo(map);
@@ -55,20 +56,19 @@ let ambMarker = null;
 let hospMarker = null;
 let routeLine = null;
 
-/* 📏 DISTANCE */
+/* DISTANCE */
 function distanceKm(a, b) {
   const R = 6371;
-  const dLat = (b[0] - a[0]) * Math.PI / 180;
-  const dLng = (b[1] - a[1]) * Math.PI / 180;
+  const dLat = (b[0]-a[0]) * Math.PI/180;
+  const dLng = (b[1]-a[1]) * Math.PI/180;
   const x =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(a[0] * Math.PI / 180) *
-    Math.cos(b[0] * Math.PI / 180) *
-    Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+    Math.sin(dLat/2)**2 +
+    Math.cos(a[0]*Math.PI/180) *
+    Math.cos(b[0]*Math.PI/180) *
+    Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
 }
 
-/* 🔄 UPDATE LOOP */
 async function update() {
   const { data } = await supabaseClient
     .from("alerts")
@@ -82,8 +82,8 @@ async function update() {
     return;
   }
 
-  const hospitalCoords = hospitals[data.hospital];
-  if (!hospitalCoords) {
+  const hosp = hospitals[data.hospital];
+  if (!hosp) {
     document.getElementById("status").innerText =
       "Unknown hospital selected";
     return;
@@ -95,24 +95,19 @@ async function update() {
   const [lat, lng] = data.location.split(",").map(Number);
   const amb = [lat, lng];
 
-  /* MARKERS */
   if (!ambMarker) {
     ambMarker = L.marker(amb).addTo(map);
-    hospMarker = L.marker(hospitalCoords).addTo(map);
+    hospMarker = L.marker(hosp).addTo(map);
     map.setView(amb, 14);
   } else {
     ambMarker.setLatLng(amb);
   }
 
-  /* ROUTE LINE */
   if (routeLine) map.removeLayer(routeLine);
-  routeLine = L.polyline([amb, hospitalCoords], {
-    color: "blue",
-    weight: 4
-  }).addTo(map);
+  routeLine = L.polyline([amb, hosp], { color: "blue", weight: 4 })
+    .addTo(map);
 
-  /* DISTANCE + ETA */
-  const d = distanceKm(amb, hospitalCoords);
+  const d = distanceKm(amb, hosp);
   document.getElementById("dist").innerText = d.toFixed(2);
   document.getElementById("eta").innerText =
     ((d / 40) * 60).toFixed(1);
