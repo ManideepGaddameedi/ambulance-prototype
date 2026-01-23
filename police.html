@@ -12,7 +12,7 @@
       background: #f4f6f9;
     }
     .box {
-      max-width: 460px;
+      max-width: 480px;
       margin: 30px auto;
       background: white;
       padding: 15px;
@@ -24,13 +24,19 @@
       margin-top: 10px;
       border-radius: 8px;
     }
+    .eta {
+      margin-top: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #d32f2f;
+    }
   </style>
 </head>
 <body>
 
 <div class="box">
   <h2>🚦 Traffic Police Control</h2>
-  <p><b>Live Ambulance Route (Road Based)</b></p>
+  <div class="eta" id="eta">ETA: calculating…</div>
   <div id="map"></div>
 </div>
 
@@ -48,10 +54,10 @@ const supabaseClient = supabase.createClient(
 let map = L.map("map").setView([17.385, 78.486], 14);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-let ambulanceMarker, destinationMarker, routeLine;
+let ambMarker, destMarker, routeLine;
 let lastRouteKey = "";
 
-/* 🚑 Fetch data & draw Google-style route */
+/* 🔄 Update route + ETA */
 async function updateRoute() {
   const { data } = await supabaseClient
     .from("alerts")
@@ -65,20 +71,19 @@ async function updateRoute() {
   const [dlat, dlng] = data.destination.split(",").map(Number);
 
   /* Ambulance marker */
-  if (!ambulanceMarker) {
-    ambulanceMarker = L.marker([alat, alng]).addTo(map);
+  if (!ambMarker) {
+    ambMarker = L.marker([alat, alng]).addTo(map);
   } else {
-    ambulanceMarker.setLatLng([alat, alng]);
+    ambMarker.setLatLng([alat, alng]);
   }
 
   /* Destination marker */
-  if (!destinationMarker) {
-    destinationMarker = L.marker([dlat, dlng])
+  if (!destMarker) {
+    destMarker = L.marker([dlat, dlng])
       .addTo(map)
       .bindPopup("🏥 " + data.destination_name);
   }
 
-  /* 🔑 Route key (avoid unnecessary API calls) */
   const routeKey = `${alat},${alng}-${dlat},${dlng}`;
   if (routeKey === lastRouteKey) return;
   lastRouteKey = routeKey;
@@ -90,11 +95,12 @@ async function updateRoute() {
 
   const res = await fetch(url);
   const json = await res.json();
-
   if (!json.routes || !json.routes.length) return;
 
-  const coords = json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+  const route = json.routes[0];
 
+  /* 🧭 Draw route */
+  const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
   if (routeLine) {
     routeLine.setLatLngs(coords);
   } else {
@@ -102,9 +108,15 @@ async function updateRoute() {
       color: "red",
       weight: 5
     }).addTo(map);
-
     map.fitBounds(routeLine.getBounds());
   }
+
+  /* ⏱️ ETA CALCULATION */
+  const durationMin = Math.ceil(route.duration / 60); // seconds → minutes
+  const distanceKm = (route.distance / 1000).toFixed(1); // meters → km
+
+  document.getElementById("eta").innerText =
+    `ETA: ${durationMin} min (${distanceKm} km)`;
 }
 
 /* Update every 4 seconds */
