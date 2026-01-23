@@ -1,10 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Traffic Police Control</title>
+  <title>Ambulance Device</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
   <style>
     body {
@@ -12,29 +10,36 @@
       background: #f4f6f9;
     }
     .box {
-      max-width: 460px;
-      margin: 30px auto;
+      max-width: 420px;
+      margin: 40px auto;
       background: white;
-      padding: 15px;
+      padding: 20px;
       border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      text-align: center;
     }
-    #map {
-      height: 380px;
+    input, button {
+      width: 100%;
+      padding: 10px;
       margin-top: 10px;
-      border-radius: 8px;
+      font-size: 16px;
     }
   </style>
 </head>
 <body>
 
 <div class="box">
-  <h2>🚦 Traffic Police Control</h2>
-  <p><b>Ambulance → Destination Route</b></p>
-  <div id="map"></div>
+  <h2>🚑 Ambulance Device</h2>
+
+  <input id="destination" placeholder="Destination (lat,lng)" />
+  <input id="location" placeholder="Live location..." readonly />
+
+  <button onclick="startTracking()">▶ START TRACKING</button>
+  <button onclick="stopTracking()">⛔ STOP TRACKING</button>
+
+  <p id="msg"></p>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
@@ -43,40 +48,41 @@ const supabaseClient = supabase.createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-let map = L.map("map").setView([17.385, 78.486], 14);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+let watchId = null;
 
-let ambMarker, destMarker, routeLine;
+function startTracking() {
+  const dest = document.getElementById("destination").value.trim();
 
-async function updateRoute() {
-  const { data } = await supabaseClient
-    .from("alerts")
-    .select("location, destination")
-    .eq("id", 1)
-    .single();
-
-  if (!data) return;
-
-  const [alat, alng] = data.location.split(",").map(Number);
-  const [dlat, dlng] = data.destination.split(",").map(Number);
-
-  if (!ambMarker) {
-    ambMarker = L.marker([alat, alng]).addTo(map);
-    destMarker = L.marker([dlat, dlng]).addTo(map)
-      .bindPopup("🏥 Destination");
-    routeLine = L.polyline(
-      [[alat, alng], [dlat, dlng]],
-      { color: "red", weight: 4 }
-    ).addTo(map);
-
-    map.fitBounds(routeLine.getBounds());
-  } else {
-    ambMarker.setLatLng([alat, alng]);
-    routeLine.setLatLngs([[alat, alng], [dlat, dlng]]);
+  if (!dest || !dest.includes(",")) {
+    alert("Enter destination as lat,lng");
+    return;
   }
+
+  watchId = navigator.geolocation.watchPosition(async pos => {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    const loc = `${lat},${lng}`;
+
+    document.getElementById("location").value = loc;
+
+    await supabaseClient
+      .from("alerts")
+      .upsert({
+        id: 1,
+        location: loc,
+        destination: dest
+      });
+
+    document.getElementById("msg").innerText =
+      "📍 Live tracking started";
+  });
 }
 
-setInterval(updateRoute, 3000);
+function stopTracking() {
+  navigator.geolocation.clearWatch(watchId);
+  document.getElementById("msg").innerText =
+    "⛔ Tracking stopped";
+}
 </script>
 
 </body>
