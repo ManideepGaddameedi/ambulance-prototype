@@ -3,15 +3,15 @@
 <head>
   <title>Traffic Police Dashboard</title>
   <link rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
 
 <h2>🚦 Traffic Police Control</h2>
 
+<p><b>Hospital:</b> <span id="hname">--</span></p>
 <p><b>Distance:</b> <span id="dist">--</span> km</p>
-<p><b>ETA:</b> <span id="eta">--</span> mins</p>
-<p><b>Intersections:</b> <span id="ints">--</span></p>
+<p><b>ETA:</b> <span id="eta">--</span> min</p>
 
 <div id="map" style="height:400px;"></div>
 
@@ -24,73 +24,57 @@ const supabaseClient = supabase.createClient(
   "YOUR_ANON_KEY"
 );
 
-/* 🏥 FIXED HOSPITAL LOCATION (DEMO) */
-const HOSPITAL = [17.3850, 78.4867]; // Example: Hyderabad hospital
+/* SAME HOSPITAL LIST (STATIC DEMO DATA) */
+const hospitals = {
+  "Gandhi Hospital":[17.4239,78.5019],
+  "Apollo Hospital":[17.4065,78.4772],
+  "Yashoda Hospital":[17.4422,78.4664]
+};
 
-/* 🗺 MAP */
-const map = L.map("map").setView(HOSPITAL, 13);
+const map = L.map("map").setView([17.385,78.4867],13);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
   .addTo(map);
 
-L.marker(HOSPITAL).addTo(map).bindPopup("Hospital");
+let ambMarker, hospMarker, routeLine;
 
-let ambMarker = null;
-let routeLine = null;
-
-/* 🌍 DISTANCE FORMULA */
-function distanceKm(a, b) {
-  const R = 6371;
-  const dLat = (b[0]-a[0]) * Math.PI/180;
-  const dLng = (b[1]-a[1]) * Math.PI/180;
-  const x =
-    Math.sin(dLat/2)**2 +
-    Math.cos(a[0]*Math.PI/180) *
-    Math.cos(b[0]*Math.PI/180) *
+/* Distance formula */
+function distKm(a,b){
+  const R=6371;
+  const dLat=(b[0]-a[0])*Math.PI/180;
+  const dLng=(b[1]-a[1])*Math.PI/180;
+  const x=Math.sin(dLat/2)**2+
+    Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*
     Math.sin(dLng/2)**2;
-  return (R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x)));
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
 }
 
-/* 🔄 UPDATE LOOP */
-async function update() {
+async function update(){
   const { data } = await supabaseClient
-    .from("alerts")
-    .select("*")
-    .eq("id",1)
-    .single();
+    .from("alerts").select("*").eq("id",1).single();
+  if(!data) return;
 
-  if (!data || !data.location) return;
+  const [lat,lng]=data.location.split(",").map(Number);
+  const amb=[lat,lng];
+  const hosp=hospitals[data.hospital];
 
-  const [lat, lng] = data.location.split(",").map(Number);
-  const ambPos = [lat, lng];
+  document.getElementById("hname").innerText=data.hospital;
 
-  /* Marker */
-  if (!ambMarker) {
-    ambMarker = L.marker(ambPos).addTo(map);
-  } else {
-    ambMarker.setLatLng(ambPos);
+  if(!ambMarker){
+    ambMarker=L.marker(amb).addTo(map);
+    hospMarker=L.marker(hosp).addTo(map);
+  }else{
+    ambMarker.setLatLng(amb);
   }
 
-  /* Route (STRAIGHT LINE) */
-  if (routeLine) map.removeLayer(routeLine);
-  routeLine = L.polyline([ambPos, HOSPITAL], {
-    color: "blue",
-    dashArray: "6,4"
-  }).addTo(map);
+  if(routeLine) map.removeLayer(routeLine);
+  routeLine=L.polyline([amb,hosp],{color:"blue"}).addTo(map);
 
-  /* Distance + ETA */
-  const dist = distanceKm(ambPos, HOSPITAL);
-  const avgSpeed = 40; // km/h (assumed ambulance speed)
-  const eta = (dist / avgSpeed) * 60;
-
-  document.getElementById("dist").innerText = dist.toFixed(2);
-  document.getElementById("eta").innerText = eta.toFixed(1);
-
-  /* Intersections (SIMULATED) */
-  document.getElementById("ints").innerText =
-    Math.max(1, Math.floor(dist * 2));
+  const d=distKm(amb,hosp);
+  document.getElementById("dist").innerText=d.toFixed(2);
+  document.getElementById("eta").innerText=((d/40)*60).toFixed(1);
 }
 
-setInterval(update, 3000);
+setInterval(update,3000);
 </script>
 
 </body>
