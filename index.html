@@ -1,126 +1,82 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Ambulance Device</title>
+  <title>Traffic Police Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
   <style>
-    body { font-family: Arial; background:#f4f6f9; }
-    .box {
-      max-width: 420px; margin: 40px auto; background: white;
-      padding: 20px; border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: center;
+    body {
+      font-family: Arial;
+      background: #f4f6f9;
     }
-    button { width:100%; padding:12px; margin-top:10px; font-size:16px; }
-    input { width:100%; padding:8px; margin-top:10px; }
-    #map{height:300px;margin-top:15px;border-radius:8px;}
+    .box {
+      max-width: 460px;
+      margin: 30px auto;
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    }
+    #map {
+      height: 380px;
+      margin-top: 10px;
+      border-radius: 8px;
+    }
   </style>
 </head>
 <body>
 
 <div class="box">
-  <h2>🚑 Ambulance Device</h2>
-
-  <input type="text" id="location" readonly>
-  <button onclick="startTracking()">▶ START TRACKING</button>
-  <button onclick="stopTracking()">⛔ STOP TRACKING</button>
-
-  <p id="msg"></p>
-
+  <h2>🚦 Traffic Police Control</h2>
+  <p><b>Ambulance → Destination Route</b></p>
   <div id="map"></div>
-  <h3>Nearby Hospitals</h3>
-  <ul id="hospitalList"></ul>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-const hospitals = [
-  {name:"Nellore Govt Hospital", lat:14.4426, lng:79.9865},
-  {name:"Apollo Nellore", lat:14.4493, lng:79.9876},
-  {name:"Lotus Nellore", lat:14.4380, lng:79.9750},
-  {name:"Simhapuri Nellore", lat:14.4455, lng:79.9802},
-  {name:"KIMS Saveera", lat:14.4512, lng:79.9823},
-  {name:"Sundar Nellore", lat:14.4430, lng:79.9785},
-  {name:"Apex Nellore", lat:14.4470, lng:79.9832},
-  {name:"Aditya Nellore", lat:14.4401, lng:79.9901},
-
-  {name:"Apollo Hyderabad", lat:17.3850, lng:78.4867},
-  {name:"Yashoda Hyderabad", lat:17.4399, lng:78.4983},
-  {name:"Care Banjara Hills", lat:17.4239, lng:78.4484},
-  {name:"KIMS Hyderabad", lat:17.4040, lng:78.4642},
-  {name:"Continental Hyderabad", lat:17.4015, lng:78.5663},
-  {name:"AIG Hyderabad", lat:17.4375, lng:78.3910},
-  {name:"Sunshine Hyderabad", lat:17.4849, lng:78.3915},
-  {name:"Medicover Hyderabad", lat:17.4740, lng:78.3890}
-];
-
-function getDistance(lat1, lon1, lat2, lon2){
- const R=6371;
- const dLat=(lat2-lat1)*Math.PI/180;
- const dLon=(lon2-lon1)*Math.PI/180;
- const a=Math.sin(dLat/2)**2 +
-  Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*
-  Math.sin(dLon/2)**2;
- return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-}
-
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "YOUR_ANON_KEY"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-let watchId=null, map=null, marker=null;
+let map = L.map("map").setView([17.385, 78.486], 14);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-function startTracking(){
- watchId=navigator.geolocation.watchPosition(async(pos)=>{
-   const lat=pos.coords.latitude;
-   const lng=pos.coords.longitude;
-   const locText=lat+","+lng;
+let ambMarker, destMarker, routeLine;
 
-   document.getElementById("location").value=locText;
-   document.getElementById("msg").innerText="📍 Tracking live location...";
+async function updateRoute() {
+  const { data } = await supabaseClient
+    .from("alerts")
+    .select("location, destination")
+    .eq("id", 1)
+    .single();
 
-   await supabaseClient.from("alerts").upsert({
-     id:1, location:locText
-   });
+  if (!data) return;
 
-   showHospitals(lat,lng);
- });
+  const [alat, alng] = data.location.split(",").map(Number);
+  const [dlat, dlng] = data.destination.split(",").map(Number);
+
+  if (!ambMarker) {
+    ambMarker = L.marker([alat, alng]).addTo(map);
+    destMarker = L.marker([dlat, dlng]).addTo(map)
+      .bindPopup("🏥 Destination");
+    routeLine = L.polyline(
+      [[alat, alng], [dlat, dlng]],
+      { color: "red", weight: 4 }
+    ).addTo(map);
+
+    map.fitBounds(routeLine.getBounds());
+  } else {
+    ambMarker.setLatLng([alat, alng]);
+    routeLine.setLatLngs([[alat, alng], [dlat, dlng]]);
+  }
 }
 
-function showHospitals(lat,lng){
- if(!map){
-   map=L.map('map').setView([lat,lng],13);
-   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
- }
-
- if(marker) marker.remove();
- marker=L.marker([lat,lng]).addTo(map).bindPopup("Ambulance").openPopup();
-
- let list=document.getElementById("hospitalList");
- list.innerHTML="";
-
- let sorted=hospitals.map(h=>({...h,dist:getDistance(lat,lng,h.lat,h.lng)}))
-   .sort((a,b)=>a.dist-b.dist);
-
- sorted.slice(0,5).forEach(h=>{
-   let li=document.createElement("li");
-   li.innerText=`${h.name} - ${h.dist.toFixed(2)} KM`;
-   list.appendChild(li);
-
-   L.marker([h.lat,h.lng]).addTo(map).bindPopup(h.name);
-   L.polyline([[lat,lng],[h.lat,h.lng]],{color:'red'}).addTo(map);
- });
-}
-
-function stopTracking(){
- navigator.geolocation.clearWatch(watchId);
- document.getElementById("msg").innerText="⛔ Tracking stopped";
-}
+setInterval(updateRoute, 3000);
 </script>
 
 </body>
