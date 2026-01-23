@@ -1,49 +1,82 @@
+* {
+    box-sizing: border-box;
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+
 body {
-  background: #f4f6f9;
-  font-family: Arial, sans-serif;
+    margin: 0;
+    background: #f4f6f8;
 }
 
-.box {
-  width: 400px;
-  margin: 60px auto;
-  background: white;
-  padding: 25px;
-  border-radius: 10px;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+/* ================= CONTAINERS ================= */
+.container,
+.dashboard {
+    max-width: 520px;
+    margin: 20px auto;
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
 }
 
+/* ================= HEADINGS ================= */
 h1 {
-  text-align: center;
-  color: #c62828;
+    margin-top: 0;
+    color: #c62828;
 }
 
-label {
-  font-weight: bold;
-  display: block;
-  margin-top: 15px;
-}
-
+/* ================= INPUT ================= */
 input {
-  width: 100%;
-  padding: 8px;
-  margin-top: 5px;
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0 20px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 15px;
 }
 
+/* ================= BUTTON ================= */
 button {
-  margin-top: 20px;
-  width: 100%;
-  padding: 12px;
-  font-size: 16px;
-  background: red;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
+    width: 100%;
+    padding: 14px;
+    background: #d32f2f;
+    border: none;
+    color: white;
+    font-size: 16px;
+    border-radius: 6px;
+    cursor: pointer;
 }
 
-.alert {
-  background: #fff3cd;
-  padding: 15px;
-  border-left: 6px solid orange;
-  margin-top: 20px;
+button:hover {
+    background: #b71c1c;
+}
+
+/* ================= STATUS ================= */
+.status {
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+.status.idle {
+    color: #555;
+}
+
+.status.active {
+    color: green;
+}
+
+/* ================= MAP ================= */
+#map {
+    height: 70vh;          /* VERY IMPORTANT */
+    width: 100%;
+    margin-top: 10px;
+    border-top: 3px solid #c62828;
+}
+
+/* ================= RESPONSIVE ================= */
+@media (max-width: 600px) {
+    #map {
+        height: 60vh;
+    }
 }
