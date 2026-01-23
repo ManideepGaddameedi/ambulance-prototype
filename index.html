@@ -2,37 +2,45 @@
 <html>
 <head>
   <title>Ambulance GPS Sender</title>
+  <meta charset="utf-8" />
   <style>
     body {
-      font-family: Arial;
+      font-family: Arial, sans-serif;
       text-align: center;
       margin-top: 40px;
     }
     button {
-      padding: 12px 20px;
+      padding: 12px 24px;
       font-size: 16px;
+      cursor: pointer;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 15px;
+      color: green;
     }
   </style>
 </head>
 <body>
 
-<h2>🚑 Ambulance Live GPS</h2>
-<p id="status">Waiting for GPS...</p>
-
+<h2>🚑 Smart Ambulance – Live GPS</h2>
 <button onclick="startTracking()">Start Sending Location</button>
+<p id="status">Waiting for GPS permission…</p>
 
-<!-- Supabase -->
+<!-- Supabase JS -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
 <script>
-  // 🔹 Supabase config
-  const supabaseUrl = "https://YOUR_PROJECT_ID.supabase.co";
-  const supabaseKey = "YOUR_ANON_PUBLIC_KEY";
+  // ✅ YOUR SUPABASE DETAILS
+  const supabaseUrl = "https://inlkqessbewmxmtfvzfe.supabase.co";
+  const supabaseKey =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0l";
+
   const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
   function startTracking() {
     if (!navigator.geolocation) {
-      alert("GPS not supported");
+      alert("Geolocation not supported");
       return;
     }
 
@@ -42,9 +50,9 @@
         const lng = position.coords.longitude;
 
         document.getElementById("status").innerText =
-          "Sending: " + lat + ", " + lng;
+          "Sending Location: " + lat.toFixed(5) + ", " + lng.toFixed(5);
 
-        // 🔹 Update location in Supabase
+        // 🔹 Update GPS in Supabase
         await supabase
           .from("ambulance_location")
           .update({
@@ -54,7 +62,10 @@
           })
           .eq("ambulance_id", "AMB001");
       },
-      () => alert("GPS permission denied"),
+      (err) => {
+        alert("GPS permission denied");
+        console.error(err);
+      },
       { enableHighAccuracy: true }
     );
   }
