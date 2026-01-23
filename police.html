@@ -2,6 +2,7 @@
 <html>
 <head>
   <title>Police Dashboard – Smart Ambulance</title>
+  <meta charset="utf-8" />
 
   <!-- Leaflet CSS -->
   <link
@@ -27,53 +28,55 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
 <script>
-  // 🔹 Supabase config
-  const supabaseUrl = "https://YOUR_PROJECT_ID.supabase.co";
-  const supabaseKey = "YOUR_ANON_PUBLIC_KEY";
+  // ✅ YOUR SUPABASE DETAILS
+  const supabaseUrl = "https://inlkqessbewmxmtfvzfe.supabase.co";
+  const supabaseKey =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0l";
+
   const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-  // 🔹 Hospital (fixed)
+  // 🏥 Hospital (fixed location – change if needed)
   const hospitalLat = 17.3850;
   const hospitalLng = 78.4867;
 
-  // 🔹 Map init
+  // 🗺️ Map initialization
   const map = L.map("map").setView([hospitalLat, hospitalLng], 14);
 
-  // Base Map (roads, buildings, landmarks)
+  // Base map: roads, buildings, landmarks
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "© OpenStreetMap"
   }).addTo(map);
 
-  // 🔹 Icons
+  // 🚑 Ambulance icon
   const ambulanceIcon = L.icon({
     iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
     iconSize: [40, 40]
   });
 
+  // 🏥 Hospital icon
   const hospitalIcon = L.icon({
     iconUrl: "https://cdn-icons-png.flaticon.com/512/3448/3448513.png",
     iconSize: [40, 40]
   });
 
-  // 🔹 Hospital Marker
-  const hospitalMarker = L.marker(
-    [hospitalLat, hospitalLng],
-    { icon: hospitalIcon }
-  ).addTo(map).bindPopup("Hospital");
+  // Hospital marker (fixed)
+  L.marker([hospitalLat, hospitalLng], { icon: hospitalIcon })
+    .addTo(map)
+    .bindPopup("Hospital");
 
-  // 🔹 Ambulance Marker (initial)
+  // Ambulance marker (live)
   let ambulanceMarker = L.marker(
     [hospitalLat, hospitalLng],
     { icon: ambulanceIcon }
   ).addTo(map).bindPopup("Ambulance");
 
-  // 🔹 Route line
+  // Route line (polyline)
   let routeLine = L.polyline([], {
     color: "red",
     weight: 4
   }).addTo(map);
 
-  // 🔹 Listen for live GPS updates
+  // 🔴 Real-time GPS updates from Supabase
   supabase
     .channel("ambulance-live")
     .on(
@@ -87,13 +90,16 @@
         const lat = payload.new.latitude;
         const lng = payload.new.longitude;
 
+        // Move ambulance
         ambulanceMarker.setLatLng([lat, lng]);
 
+        // Draw route line
         routeLine.setLatLngs([
           [lat, lng],
           [hospitalLat, hospitalLng]
         ]);
 
+        // Center map
         map.panTo([lat, lng]);
       }
     )
