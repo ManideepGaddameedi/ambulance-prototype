@@ -1,86 +1,25 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Traffic Police</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <title>Traffic Police Dashboard</title>
 
-  <link rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
-  <style>
-    body { font-family: Arial; background:#f4f6f9; }
-    .box {
-      max-width:460px; margin:20px auto; background:#fff;
-      padding:15px; border-radius:10px;
-    }
-    #map { height:350px; margin-top:10px; }
-  </style>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js" defer></script>
 </head>
-<body>
 
-<div class="box">
-  <h2>🚦 Traffic Police Dashboard</h2>
+<body onload="initPoliceMap()">
 
-  <p><b>Hospital:</b> <span id="hospital">--</span></p>
-  <p><b>Distance:</b> <span id="dist">--</span> km</p>
-  <p><b>ETA:</b> <span id="eta">--</span> min</p>
-
-  <div id="map"></div>
+<div class="dashboard">
+    <h1>🚓 Traffic Police Control Panel</h1>
+    <p id="info">Waiting for ambulance data...</p>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<script>
-const BACKEND = "https://ambulance-backend.onrender.com";
-
-const hospitals = {
-  "Apollo Hospital": [17.4065, 78.4772],
-  "Gandhi Hospital": [17.4239, 78.5019]
-};
-
-const map = L.map("map").setView([17.38,78.48],13);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
-  .addTo(map);
-
-let ambMarker, route;
-
-function distanceKm(a,b){
-  const R=6371;
-  const dLat=(b[0]-a[0])*Math.PI/180;
-  const dLng=(b[1]-a[1])*Math.PI/180;
-  return R*2*Math.asin(Math.sqrt(
-    Math.sin(dLat/2)**2 +
-    Math.cos(a[0]*Math.PI/180) *
-    Math.cos(b[0]*Math.PI/180) *
-    Math.sin(dLng/2)**2));
-}
-
-async function update() {
-  const res = await fetch(`${BACKEND}/get_status`);
-  const data = await res.json();
-  if (!data.latitude) return;
-
-  const amb = [data.latitude, data.longitude];
-  const hosp = hospitals[data.hospital];
-
-  document.getElementById("hospital").innerText = data.hospital;
-
-  if (!ambMarker) {
-    ambMarker = L.marker(amb).addTo(map);
-  } else {
-    ambMarker.setLatLng(amb);
-  }
-
-  if (route) map.removeLayer(route);
-  route = L.polyline([amb, hosp]).addTo(map);
-
-  const d = distanceKm(amb, hosp);
-  document.getElementById("dist").innerText = d.toFixed(2);
-  document.getElementById("eta").innerText = ((d/40)*60).toFixed(1);
-}
-
-setInterval(update, 3000);
-</script>
+<div id="map"></div>
 
 </body>
 </html>
