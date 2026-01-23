@@ -6,28 +6,22 @@
 
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: Arial;
       background: #f4f6f9;
     }
     .box {
       max-width: 420px;
       margin: 40px auto;
-      background: white;
+      background: #fff;
       padding: 20px;
       border-radius: 10px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-      text-align: center;
     }
     input, select, button {
       width: 100%;
       padding: 10px;
       margin-top: 10px;
       font-size: 16px;
-    }
-    .status {
-      margin-top: 10px;
-      font-size: 14px;
-      color: green;
     }
   </style>
 </head>
@@ -36,106 +30,50 @@
 <div class="box">
   <h2>🚑 Ambulance Device</h2>
 
-  <!-- Ambulance ID -->
-  <select id="ambulanceId">
-    <option value="A1">Ambulance A1</option>
-    <option value="A2">Ambulance A2</option>
-    <option value="A3">Ambulance A3</option>
+  <select id="ambId">
+    <option value="1">Ambulance 1</option>
+    <option value="2">Ambulance 2</option>
+    <option value="3">Ambulance 3</option>
   </select>
 
-  <!-- Icon -->
-  <select id="icon">
-    <option value="ambulance1.png">Red Ambulance</option>
-    <option value="ambulance2.png">Blue Ambulance</option>
-    <option value="ambulance3.png">Green Ambulance</option>
-  </select>
+  <input id="dest" placeholder="Destination name">
+  <input id="loc" placeholder="Live location" readonly>
 
-  <!-- Destination name -->
-  <input
-    id="destinationName"
-    placeholder="Destination (e.g. Gandhi Hospital Hyderabad)"
-  >
-
-  <!-- Live GPS -->
-  <input id="location" placeholder="Live GPS location…" readonly>
-
-  <button onclick="startTracking()">▶ START TRACKING</button>
-  <button onclick="stopTracking()">⛔ STOP TRACKING</button>
-
-  <div class="status" id="status"></div>
+  <button onclick="start()">▶ START</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* 🔗 Supabase */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
 let watchId = null;
-let destinationLatLng = null;
 
-/* 🌍 Convert destination name → lat,lng */
-async function geocode(place) {
-  const res = await fetch(
-    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}`,
-    { headers: { "User-Agent": "SmartAmbulanceSystem/1.0" } }
-  );
-  const data = await res.json();
-  if (!data.length) return null;
-  return `${data[0].lat},${data[0].lon}`;
-}
-
-/* ▶ Start tracking */
-async function startTracking() {
-  const ambulanceId = document.getElementById("ambulanceId").value;
-  const icon = document.getElementById("icon").value;
-  const destName = document.getElementById("destinationName").value.trim();
+async function start() {
+  const id = parseInt(document.getElementById("ambId").value);
+  const destName = document.getElementById("dest").value;
 
   if (!destName) {
-    alert("Enter destination name");
+    alert("Enter destination");
     return;
   }
 
-  destinationLatLng = await geocode(destName);
-  if (!destinationLatLng) {
-    alert("Destination not found");
-    return;
-  }
+  watchId = navigator.geolocation.watchPosition(async pos => {
+    const loc = `${pos.coords.latitude},${pos.coords.longitude}`;
+    document.getElementById("loc").value = loc;
 
-  document.getElementById("status").innerText =
-    "Destination set: " + destName;
-
-  watchId = navigator.geolocation.watchPosition(
-    async pos => {
-      const loc = `${pos.coords.latitude},${pos.coords.longitude}`;
-      document.getElementById("location").value = loc;
-
-      await supabaseClient
-        .from("alerts")
-        .upsert({
-          ambulance_id: ambulanceId,
-          location: loc,
-          destination: destinationLatLng,
-          destination_name: destName,
-          icon: icon
-        });
-    },
-    () => alert("GPS permission denied"),
-    { enableHighAccuracy: true }
-  );
-}
-
-/* ⛔ Stop tracking */
-function stopTracking() {
-  if (watchId) {
-    navigator.geolocation.clearWatch(watchId);
-    watchId = null;
-    document.getElementById("status").innerText =
-      "Tracking stopped";
-  }
+    await supabaseClient
+      .from("alerts")
+      .upsert({
+        id: id,
+        ambulance_id: "A" + id,
+        location: loc,
+        destination_name: destName
+      });
+  });
 }
 </script>
 
