@@ -1,41 +1,104 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Ambulance GPS</title>
-  <meta charset="utf-8">
+  <title>Ambulance Device</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+    }
+    .box {
+      max-width: 420px;
+      margin: 40px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 10px;
+    }
+  </style>
 </head>
-<body style="text-align:center;font-family:Arial;margin-top:40px;">
+<body>
 
-<h2>🚑 Ambulance Live GPS</h2>
-<button onclick="start()">Start GPS</button>
-<p id="msg">Waiting...</p>
+<div class="box">
+  <h2>🚑 Ambulance Device</h2>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <input type="text" id="location" placeholder="Tracking location..." readonly>
+
+  <button onclick="startTracking()">▶ START TRACKING</button>
+  <button onclick="stopTracking()">⛔ STOP TRACKING</button>
+
+  <p id="msg"></p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-const supabase = supabase.createClient(
+const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0l"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-function start() {
-  navigator.geolocation.watchPosition(async (pos) => {
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
+let watchId = null;
 
+// ▶ Start real-time tracking
+function startTracking() {
+  if (!navigator.geolocation) {
+    alert("Geolocation not supported");
+    return;
+  }
+
+  watchId = navigator.geolocation.watchPosition(
+    async (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      const locText = lat + "," + lng;
+
+      document.getElementById("location").value = locText;
+
+      await supabaseClient
+        .from("alerts")
+        .upsert({
+          id: 1,
+          location: locText,
+          time: new Date().toLocaleTimeString()
+        });
+
+      document.getElementById("msg").innerText =
+        "📍 Tracking live location...";
+    },
+    () => {
+      alert("Location permission denied");
+    },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 5000
+    }
+  );
+}
+
+// ⛔ Stop tracking
+function stopTracking() {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
     document.getElementById("msg").innerText =
-      `Sending: ${lat}, ${lng}`;
-
-    // ✅ UPSERT (THIS IS THE FIX)
-    await supabase.from("ambulance_location").upsert({
-      ambulance_id: "AMB001",
-      latitude: lat,
-      longitude: lng,
-      updated_at: new Date()
-    });
-  },
-  () => alert("GPS permission denied"),
-  { enableHighAccuracy: true });
+      "⛔ Tracking stopped";
+  }
 }
 </script>
 
