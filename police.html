@@ -44,7 +44,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* 🔗 Supabase */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
@@ -55,9 +54,29 @@ let map = L.map("map").setView([17.385, 78.486], 14);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
 let ambMarker, destMarker, routeLine;
+let prevLatLng = null;
 let lastRouteKey = "";
 
-/* 🔄 Update route + ETA */
+/* 🚑 Smooth animation function (Zomato style) */
+function animateMarker(from, to) {
+  let step = 0;
+  const steps = 30;            // smoothness
+  const intervalTime = 100;    // speed
+
+  const latStep = (to[0] - from[0]) / steps;
+  const lngStep = (to[1] - from[1]) / steps;
+
+  const interval = setInterval(() => {
+    step++;
+    const lat = from[0] + latStep * step;
+    const lng = from[1] + lngStep * step;
+    ambMarker.setLatLng([lat, lng]);
+
+    if (step >= steps) clearInterval(interval);
+  }, intervalTime);
+}
+
+/* 🔄 Main update */
 async function updateRoute() {
   const { data } = await supabaseClient
     .from("alerts")
@@ -69,12 +88,15 @@ async function updateRoute() {
 
   const [alat, alng] = data.location.split(",").map(Number);
   const [dlat, dlng] = data.destination.split(",").map(Number);
+  const currentLatLng = [alat, alng];
 
   /* Ambulance marker */
   if (!ambMarker) {
-    ambMarker = L.marker([alat, alng]).addTo(map);
+    ambMarker = L.marker(currentLatLng).addTo(map);
+    prevLatLng = currentLatLng;
   } else {
-    ambMarker.setLatLng([alat, alng]);
+    animateMarker(prevLatLng, currentLatLng);
+    prevLatLng = currentLatLng;
   }
 
   /* Destination marker */
@@ -84,44 +106,45 @@ async function updateRoute() {
       .bindPopup("🏥 " + data.destination_name);
   }
 
+  /* Route key (avoid unnecessary calls) */
   const routeKey = `${alat},${alng}-${dlat},${dlng}`;
-  if (routeKey === lastRouteKey) return;
-  lastRouteKey = routeKey;
+  if (routeKey !== lastRouteKey) {
+    lastRouteKey = routeKey;
 
-  /* 🚗 OSRM road routing */
-  const url =
-    `https://router.project-osrm.org/route/v1/driving/` +
-    `${alng},${alat};${dlng},${dlat}?overview=full&geometries=geojson`;
+    const url =
+      `https://router.project-osrm.org/route/v1/driving/` +
+      `${alng},${alat};${dlng},${dlat}?overview=full&geometries=geojson`;
 
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.routes || !json.routes.length) return;
+    const res = await fetch(url);
+    const json = await res.json();
+    if (!json.routes || !json.routes.length) return;
 
-  const route = json.routes[0];
+    const route = json.routes[0];
 
-  /* 🧭 Draw route */
-  const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-  if (routeLine) {
-    routeLine.setLatLngs(coords);
-  } else {
-    routeLine = L.polyline(coords, {
-      color: "red",
-      weight: 5
-    }).addTo(map);
-    map.fitBounds(routeLine.getBounds());
+    /* Draw road route */
+    const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+    if (routeLine) {
+      routeLine.setLatLngs(coords);
+    } else {
+      routeLine = L.polyline(coords, {
+        color: "red",
+        weight: 5
+      }).addTo(map);
+      map.fitBounds(routeLine.getBounds());
+    }
+
+    /* ETA */
+    const etaMin = Math.ceil(route.duration / 60);
+    const distKm = (route.distance / 1000).toFixed(1);
+    document.getElementById("eta").innerText =
+      `ETA: ${etaMin} min (${distKm} km)`;
   }
-
-  /* ⏱️ ETA CALCULATION */
-  const durationMin = Math.ceil(route.duration / 60); // seconds → minutes
-  const distanceKm = (route.distance / 1000).toFixed(1); // meters → km
-
-  document.getElementById("eta").innerText =
-    `ETA: ${durationMin} min (${distanceKm} km)`;
 }
 
-/* Update every 4 seconds */
+/* 🔁 Update every 4 seconds */
 setInterval(updateRoute, 4000);
 </script>
 
 </body>
 </html>
+
