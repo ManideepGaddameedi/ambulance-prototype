@@ -4,16 +4,15 @@
   <title>Traffic Police Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: Arial;
       background: #f4f6f9;
     }
     .box {
-      max-width: 500px;
+      max-width: 520px;
       margin: 30px auto;
       background: white;
       padding: 15px;
@@ -21,17 +20,16 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.25);
     }
     #map {
-      height: 420px;
+      height: 440px;
       margin-top: 10px;
       border-radius: 8px;
     }
 
-    /* 🚑 Rotating ambulance icon */
-    .ambulance-icon {
-      width: 48px;
-      height: 48px;
-      background: url("ambulance.png") no-repeat center;
+    .amb-icon {
+      width: 42px;
+      height: 42px;
       background-size: contain;
+      background-repeat: no-repeat;
       transform-origin: center center;
       transition: transform 0.2s linear;
     }
@@ -41,7 +39,7 @@
 
 <div class="box">
   <h2>🚦 Traffic Police Control</h2>
-  <p>Live Ambulance Route Tracking</p>
+  <p>Multiple Ambulances – Live Tracking</p>
   <div id="map"></div>
 </div>
 
@@ -56,25 +54,13 @@ const supabaseClient = supabase.createClient(
 );
 
 /* 🗺 Map */
-const map = L.map("map").setView([17.385, 78.486], 14);
+const map = L.map("map").setView([17.385, 78.486], 13);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-/* 🚑 Custom rotating icon */
-const ambulanceIcon = L.divIcon({
-  className: "",
-  html: `<div class="ambulance-icon" id="ambIcon"></div>`,
-  iconSize: [48, 48],
-  iconAnchor: [24, 24]
-});
+/* Store all ambulances */
+const ambulances = {};
 
-let ambMarker = null;
-let destMarker = null;
-let routeLine = null;
-
-let lastPos = null;
-let animationTimer = null;
-
-/* 🧭 Bearing calculation */
+/* 🧭 Bearing */
 function getBearing(from, to) {
   const lat1 = from[0] * Math.PI / 180;
   const lat2 = to[0] * Math.PI / 180;
@@ -88,84 +74,93 @@ function getBearing(from, to) {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
-/* 🚑 Smooth move + rotate */
-function moveSmooth(from, to) {
-  if (animationTimer) clearInterval(animationTimer);
+/* 🚑 Smooth movement */
+function moveSmooth(amb, from, to) {
+  if (amb.timer) clearInterval(amb.timer);
 
   const angle = getBearing(from, to);
-  const iconEl = document.getElementById("ambIcon");
-  if (iconEl) iconEl.style.transform = `rotate(${angle}deg)`;
+  amb.iconEl.style.transform = `rotate(${angle}deg)`;
 
   let step = 0;
   const steps = 20;
   const latStep = (to[0] - from[0]) / steps;
   const lngStep = (to[1] - from[1]) / steps;
 
-  animationTimer = setInterval(() => {
+  amb.timer = setInterval(() => {
     step++;
-    ambMarker.setLatLng([
+    amb.marker.setLatLng([
       from[0] + latStep * step,
       from[1] + lngStep * step
     ]);
-    if (step >= steps) clearInterval(animationTimer);
+    if (step >= steps) clearInterval(amb.timer);
   }, 100);
 }
 
-/* 🔄 Main update */
+/* 🔄 Update all ambulances */
 async function update() {
   const { data } = await supabaseClient
     .from("alerts")
-    .select("location, destination, destination_name")
-    .eq("id", 1)
-    .single();
+    .select("*");
 
-  if (!data || !data.location || !data.destination) return;
+  if (!data) return;
 
-  const [alat, alng] = data.location.split(",").map(Number);
-  const [dlat, dlng] = data.destination.split(",").map(Number);
-  const current = [alat, alng];
+  data.forEach(row => {
+    const [alat, alng] = row.location.split(",").map(Number);
+    const [dlat, dlng] = row.destination.split(",").map(Number);
+    const current = [alat, alng];
 
-  /* 🚑 Ambulance marker */
-  if (!ambMarker) {
-    ambMarker = L.marker(current, { icon: ambulanceIcon }).addTo(map);
-    lastPos = current;
-    map.setView(current, 15);
-  } else {
-    moveSmooth(lastPos, current);
-    lastPos = current;
-  }
+    /* New ambulance */
+    if (!ambulances[row.ambulance_id]) {
+      const iconHtml = `<div class="amb-icon" style="background-image:url('${row.icon}')"></div>`;
+      const icon = L.divIcon({
+        className: "",
+        html: iconHtml,
+        iconSize: [42, 42],
+        iconAnchor: [21, 21]
+      });
 
-  /* 🏥 Destination marker */
-  if (!destMarker) {
-    destMarker = L.marker([dlat, dlng])
-      .addTo(map)
-      .bindPopup("🏥 " + (data.destination_name || "Destination"));
-  }
+      const marker = L.marker(current, { icon }).addTo(map);
+      const destMarker = L.marker([dlat, dlng])
+        .addTo(map)
+        .bindPopup("🏥 " + row.destination_name);
 
-  /* 🛣️ OSRM road route */
-  const url =
-    `https://router.project-osrm.org/route/v1/driving/` +
-    `${alng},${alat};${dlng},${dlat}?overview=full&geometries=geojson`;
+      const routeLine = L.polyline([], {
+        color: "red",
+        weight: 4
+      }).addTo(map);
 
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.routes || !json.routes.length) return;
+      ambulances[row.ambulance_id] = {
+        marker,
+        destMarker,
+        routeLine,
+        lastPos: current,
+        iconEl: marker.getElement().querySelector(".amb-icon"),
+        timer: null
+      };
+    }
 
-  const coords = json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+    const amb = ambulances[row.ambulance_id];
 
-  if (routeLine) {
-    routeLine.setLatLngs(coords);
-  } else {
-    routeLine = L.polyline(coords, {
-      color: "red",
-      weight: 5
-    }).addTo(map);
-    map.fitBounds(routeLine.getBounds());
-  }
+    /* Move */
+    moveSmooth(amb, amb.lastPos, current);
+    amb.lastPos = current;
+
+    /* Route */
+    fetch(
+      `https://router.project-osrm.org/route/v1/driving/` +
+      `${alng},${alat};${dlng},${dlat}?overview=full&geometries=geojson`
+    )
+    .then(r => r.json())
+    .then(json => {
+      if (!json.routes) return;
+      const coords = json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+      amb.routeLine.setLatLngs(coords);
+    });
+  });
 }
 
-/* Refresh every 3 seconds */
-setInterval(update, 3000);
+/* Update every 4 sec */
+setInterval(update, 4000);
 </script>
 
 </body>
