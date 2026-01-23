@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Ambulance Device</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="box">
+  <h1>🚑 Ambulance Device</h1>
+
+  <label>Location / Area</label>
+  <input type="text" id="location" placeholder="Ex: KPHB Colony, Hyderabad">
+
+  <label>Direction</label>
+  <input type="text" id="direction" placeholder="LEFT / RIGHT / STRAIGHT">
+
+  <button onclick="sendAlert()">SEND EMERGENCY ALERT</button>
+
+  <p id="msg"></p>
+</div>
+
+<script>
+function sendAlert() {
+  localStorage.setItem("location",
+    document.getElementById("location").value);
+  localStorage.setItem("direction",
+    document.getElementById("direction").value);
+  localStorage.setItem("time",
+    new Date().toLocaleTimeString());
+
+  document.getElementById("msg").innerText =
+    "✅ Alert sent to Traffic Police";
+}
+</script>
+
+</body>
+</html>
