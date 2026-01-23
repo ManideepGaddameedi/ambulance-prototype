@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Traffic Police Control</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Police Dashboard – Smart Ambulance</title>
 
   <!-- Leaflet CSS -->
   <link
@@ -11,207 +10,94 @@
   />
 
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f9;
-    }
-    .box {
-      max-width: 440px;
-      margin: 30px auto;
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
-    }
     #map {
-      height: 340px;
-      margin-top: 10px;
-      border-radius: 8px;
-    }
-
-    /* 🚑 Ambulance vehicle */
-    .ambulance-box {
-      width: 64px;
-      height: 34px;
-      background: white;
-      border: 2px solid red;
-      border-radius: 6px;
-      position: relative;
-      box-shadow: 0 0 8px rgba(0,0,0,0.4);
-      font-family: Arial, sans-serif;
-    }
-
-    .ambulance-top {
-      font-size: 12px;
-      font-weight: bold;
-      color: red;
-      text-align: center;
-      line-height: 12px;
-    }
-
-    .ambulance-plus {
-      font-size: 16px;
-      font-weight: bold;
-      color: red;
-      text-align: center;
-      line-height: 14px;
-    }
-
-    /* 🚨 Flashing lights */
-    .light-left, .light-right {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      position: absolute;
-      top: -5px;
-      animation: flash 1s infinite;
-    }
-
-    .light-left {
-      left: 10px;
-      background: red;
-    }
-
-    .light-right {
-      right: 10px;
-      background: blue;
-      animation-delay: 0.5s;
-    }
-
-    @keyframes flash {
-      0% { opacity: 1; }
-      50% { opacity: 0.2; }
-      100% { opacity: 1; }
+      height: 100vh;
+      width: 100%;
     }
   </style>
 </head>
 <body>
 
-<div class="box">
-  <h2>🚦 Traffic Police Control</h2>
-
-  <p>
-    <b>Ambulance Location:</b><br>
-    <span id="loc">Detecting location…</span>
-  </p>
-
-  <div id="map"></div>
-</div>
+<div id="map"></div>
 
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<!-- Supabase -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Supabase JS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
 <script>
-/* 🔗 Supabase */
-const supabaseClient = supabase.createClient(
-  "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
-);
+  // 🔹 Supabase config
+  const supabaseUrl = "https://YOUR_PROJECT_ID.supabase.co";
+  const supabaseKey = "YOUR_ANON_PUBLIC_KEY";
+  const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-/* 🗺 Map */
-let map = L.map("map").setView([17.385, 78.4867], 15);
+  // 🔹 Hospital (fixed)
+  const hospitalLat = 17.3850;
+  const hospitalLng = 78.4867;
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: "© OpenStreetMap contributors"
-}).addTo(map);
+  // 🔹 Map init
+  const map = L.map("map").setView([hospitalLat, hospitalLng], 14);
 
-/* 🚑 Animated Ambulance Marker */
-const ambulanceIcon = L.divIcon({
-  className: "",
-  html: `
-    <div class="ambulance-box">
-      <div class="light-left"></div>
-      <div class="light-right"></div>
+  // Base Map (roads, buildings, landmarks)
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap"
+  }).addTo(map);
 
-      <div class="ambulance-top">108</div>
-      <div class="ambulance-plus">+</div>
-    </div>
-  `,
-  iconSize: [64, 34],
-  iconAnchor: [32, 17]
-});
+  // 🔹 Icons
+  const ambulanceIcon = L.icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
+    iconSize: [40, 40]
+  });
 
-let marker = null;
-let lastLatLng = null;
-let lastText = "";
+  const hospitalIcon = L.icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/3448/3448513.png",
+    iconSize: [40, 40]
+  });
 
-/* 🔄 Fetch, animate & convert to location name */
-async function updateLocation() {
-  const { data } = await supabaseClient
-    .from("alerts")
-    .select("*")
-    .eq("id", 1)
-    .single();
+  // 🔹 Hospital Marker
+  const hospitalMarker = L.marker(
+    [hospitalLat, hospitalLng],
+    { icon: hospitalIcon }
+  ).addTo(map).bindPopup("Hospital");
 
-  if (data && data.location) {
-    const parts = data.location.split(",");
-    const lat = parseFloat(parts[0]);
-    const lng = parseFloat(parts[1]);
-    const newLatLng = [lat, lng];
+  // 🔹 Ambulance Marker (initial)
+  let ambulanceMarker = L.marker(
+    [hospitalLat, hospitalLng],
+    { icon: ambulanceIcon }
+  ).addTo(map).bindPopup("Ambulance");
 
-    // Smooth marker movement
-    if (!marker) {
-      marker = L.marker(newLatLng, { icon: ambulanceIcon }).addTo(map);
-      map.setView(newLatLng, 16);
-      lastLatLng = newLatLng;
-    } else {
-      animateMarker(lastLatLng, newLatLng);
-      lastLatLng = newLatLng;
-    }
+  // 🔹 Route line
+  let routeLine = L.polyline([], {
+    color: "red",
+    weight: 4
+  }).addTo(map);
 
-    // 🔁 Convert lat,lng → location name (only when changed)
-    if (data.location !== lastText) {
-      lastText = data.location;
+  // 🔹 Listen for live GPS updates
+  supabase
+    .channel("ambulance-live")
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "ambulance_location"
+      },
+      (payload) => {
+        const lat = payload.new.latitude;
+        const lng = payload.new.longitude;
 
-      const geoRes = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-      );
-      const geoData = await geoRes.json();
+        ambulanceMarker.setLatLng([lat, lng]);
 
-      const place =
-        geoData.address.suburb ||
-        geoData.address.neighbourhood ||
-        geoData.address.village ||
-        geoData.address.town ||
-        geoData.address.city ||
-        "Unknown area";
+        routeLine.setLatLngs([
+          [lat, lng],
+          [hospitalLat, hospitalLng]
+        ]);
 
-      const city =
-        geoData.address.city ||
-        geoData.address.town ||
-        geoData.address.state ||
-        "";
-
-      document.getElementById("loc").innerText =
-        place + (city ? ", " + city : "");
-    }
-  }
-}
-
-/* ✨ Smooth animation */
-function animateMarker(from, to) {
-  let step = 0;
-  const steps = 20;
-
-  const latStep = (to[0] - from[0]) / steps;
-  const lngStep = (to[1] - from[1]) / steps;
-
-  const interval = setInterval(() => {
-    step++;
-    marker.setLatLng([
-      from[0] + latStep * step,
-      from[1] + lngStep * step
-    ]);
-
-    if (step === steps) clearInterval(interval);
-  }, 100);
-}
-
-/* Update every 3 seconds */
-setInterval(updateLocation, 3000);
+        map.panTo([lat, lng]);
+      }
+    )
+    .subscribe();
 </script>
 
 </body>
