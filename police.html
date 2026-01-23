@@ -11,6 +11,7 @@
       font-family: Arial;
       background: #f4f6f9;
     }
+
     .box {
       max-width: 480px;
       margin: 30px auto;
@@ -19,15 +20,21 @@
       border-radius: 10px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.25);
     }
+
     #map {
       height: 400px;
       margin-top: 10px;
       border-radius: 8px;
     }
-    .eta {
-      font-weight: bold;
-      color: #d32f2f;
-      margin-bottom: 6px;
+
+    /* 🚑 Rotating icon wrapper */
+    .ambulance-icon {
+      width: 48px;
+      height: 48px;
+      background: url("ambulance.png") no-repeat center;
+      background-size: contain;
+      transform-origin: center center;
+      transition: transform 0.2s linear;
     }
   </style>
 </head>
@@ -35,7 +42,7 @@
 
 <div class="box">
   <h2>🚦 Traffic Police Control</h2>
-  <div class="eta" id="eta">Live Ambulance Tracking</div>
+  <p>Live Ambulance Tracking</p>
   <div id="map"></div>
 </div>
 
@@ -53,20 +60,40 @@ const supabaseClient = supabase.createClient(
 const map = L.map("map").setView([17.385, 78.486], 14);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-/* 🚑 Ambulance ICON */
-const ambulanceIcon = L.icon({
-  iconUrl: "ambulance.png",   // 👈 make sure this file exists
+/* 🚑 Custom rotating icon */
+const ambulanceIcon = L.divIcon({
+  className: "",
+  html: `<div class="ambulance-icon" id="ambIcon"></div>`,
   iconSize: [48, 48],
   iconAnchor: [24, 24]
 });
 
-let ambulanceMarker = null;
-let lastPosition = null;
+let marker = null;
+let lastPos = null;
 let animationTimer = null;
 
-/* 🚑 Smooth movement */
+/* 🧭 Calculate bearing angle */
+function getBearing(from, to) {
+  const lat1 = from[0] * Math.PI / 180;
+  const lat2 = to[0] * Math.PI / 180;
+  const dLon = (to[1] - from[1]) * Math.PI / 180;
+
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+
+  let brng = Math.atan2(y, x) * 180 / Math.PI;
+  return (brng + 360) % 360;
+}
+
+/* 🚑 Smooth move + rotate */
 function moveSmooth(from, to) {
   if (animationTimer) clearInterval(animationTimer);
+
+  const bearing = getBearing(from, to);
+  const iconEl = document.getElementById("ambIcon");
+  if (iconEl) iconEl.style.transform = `rotate(${bearing}deg)`;
 
   let step = 0;
   const steps = 20;
@@ -75,7 +102,7 @@ function moveSmooth(from, to) {
 
   animationTimer = setInterval(() => {
     step++;
-    ambulanceMarker.setLatLng([
+    marker.setLatLng([
       from[0] + latStep * step,
       from[1] + lngStep * step
     ]);
@@ -84,7 +111,7 @@ function moveSmooth(from, to) {
   }, 100);
 }
 
-/* 🔄 Fetch live GPS */
+/* 🔄 Fetch GPS */
 async function update() {
   const { data } = await supabaseClient
     .from("alerts")
@@ -94,16 +121,15 @@ async function update() {
 
   if (!data || !data.location) return;
 
-  const [lat, lng] = data.location.split(",").map(Number);
-  const current = [lat, lng];
+  const current = data.location.split(",").map(Number);
 
-  if (!ambulanceMarker) {
-    ambulanceMarker = L.marker(current, { icon: ambulanceIcon }).addTo(map);
-    lastPosition = current;
+  if (!marker) {
+    marker = L.marker(current, { icon: ambulanceIcon }).addTo(map);
+    lastPos = current;
     map.setView(current, 15);
   } else {
-    moveSmooth(lastPosition, current);
-    lastPosition = current;
+    moveSmooth(lastPos, current);
+    lastPos = current;
   }
 }
 
