@@ -51,6 +51,28 @@ const supabaseClient = supabase.createClient(
 let watchId = null;
 let destinationLatLng = null;
 
+/* ✅ ADDED: 10 ambulance numbers */
+const ambulanceNumbers = [
+  "AP26AB1234",
+  "AP26CD5678",
+  "AP26EF9012",
+  "AP26GH3456",
+  "AP26IJ7890",
+  "TG09XY1111",
+  "TG09XY2222",
+  "TG09XY3333",
+  "TG09XY4444",
+  "TG09XY5555"
+];
+
+/* ✅ ADDED: Ask which ambulance is starting */
+const ambulanceId = prompt(
+  "Enter Ambulance Vehicle Number:\n" + ambulanceNumbers.join("\n")
+);
+
+document.getElementById("msg").innerText =
+  "Ambulance Vehicle ID: " + ambulanceId;
+
 /* Convert destination name → lat,lng */
 async function getCoordinates(place) {
   const res = await fetch(
@@ -85,7 +107,9 @@ async function startTracking() {
     await supabaseClient
       .from("alerts")
       .upsert({
-        id: 1,
+        // ❌ old: id: 1
+        // ✅ ADDED:
+        id: ambulanceId,
         location: loc,
         destination: destinationLatLng,
         destination_name: place
