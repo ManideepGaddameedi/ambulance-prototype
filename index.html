@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Ambulance Device</title>
+  <title>Ambulance GPS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f9;
+      font-family: Arial;
+      background: #eef2f7;
     }
     .box {
       max-width: 420px;
@@ -18,30 +19,22 @@
       text-align: center;
     }
     button {
-      width: 100%;
-      padding: 12px;
-      margin-top: 10px;
+      padding: 10px 20px;
       font-size: 16px;
+      background: #28a745;
+      color: white;
+      border: none;
+      border-radius: 6px;
       cursor: pointer;
-    }
-    input {
-      width: 100%;
-      padding: 8px;
-      margin-top: 10px;
     }
   </style>
 </head>
 <body>
 
 <div class="box">
-  <h2>🚑 Ambulance Device</h2>
-
-  <input type="text" id="location" placeholder="Tracking location..." readonly>
-
-  <button onclick="startTracking()">▶ START TRACKING</button>
-  <button onclick="stopTracking()">⛔ STOP TRACKING</button>
-
-  <p id="msg"></p>
+  <h2>🚑 Ambulance GPS Sender</h2>
+  <p id="status">Press button to send location</p>
+  <button onclick="sendLocation()">Send Live Location</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -52,53 +45,27 @@ const supabaseClient = supabase.createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-let watchId = null;
-
-// ▶ Start real-time tracking
-function startTracking() {
+function sendLocation() {
   if (!navigator.geolocation) {
-    alert("Geolocation not supported");
+    alert("GPS not supported");
     return;
   }
 
-  watchId = navigator.geolocation.watchPosition(
-    async (position) => {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      const locText = lat + "," + lng;
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const lat = pos.coords.latitude.toFixed(6);
+    const lng = pos.coords.longitude.toFixed(6);
+    const location = `${lat},${lng}`;
 
-      document.getElementById("location").value = locText;
+    await supabaseClient
+      .from("alerts")
+      .update({ location: location })
+      .eq("id", 1);
 
-      await supabaseClient
-        .from("alerts")
-        .upsert({
-          id: 1,
-          location: locText,
-          time: new Date().toLocaleTimeString()
-        });
-
-      document.getElementById("msg").innerText =
-        "📍 Tracking live location...";
-    },
-    () => {
-      alert("Location permission denied");
-    },
-    {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 5000
-    }
-  );
-}
-
-// ⛔ Stop tracking
-function stopTracking() {
-  if (watchId !== null) {
-    navigator.geolocation.clearWatch(watchId);
-    watchId = null;
-    document.getElementById("msg").innerText =
-      "⛔ Tracking stopped";
-  }
+    document.getElementById("status").innerText =
+      "📍 Location Sent: " + location;
+  }, () => {
+    alert("Location permission denied");
+  });
 }
 </script>
 
