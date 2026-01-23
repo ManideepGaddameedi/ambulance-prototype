@@ -4,20 +4,85 @@
   <title>Traffic Police Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <!-- Leaflet CSS -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
 
   <style>
-    body { font-family: Arial; background:#f4f6f9; }
-    .box {
-      max-width:460px; margin:30px auto; background:#fff;
-      padding:15px; border-radius:10px;
-      box-shadow:0 4px 10px rgba(0,0,0,.25);
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
     }
-    #map { height:350px; margin-top:10px; border-radius:8px; }
-    .status { font-weight:bold; margin-top:8px; }
+    .box {
+      max-width: 440px;
+      margin: 30px auto;
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    }
+    #map {
+      height: 340px;
+      margin-top: 10px;
+      border-radius: 8px;
+    }
+
+    /* 🚑 Ambulance vehicle */
+    .ambulance-box {
+      width: 64px;
+      height: 34px;
+      background: white;
+      border: 2px solid red;
+      border-radius: 6px;
+      position: relative;
+      box-shadow: 0 0 8px rgba(0,0,0,0.4);
+      font-family: Arial, sans-serif;
+    }
+
+    .ambulance-top {
+      font-size: 12px;
+      font-weight: bold;
+      color: red;
+      text-align: center;
+      line-height: 12px;
+    }
+
+    .ambulance-plus {
+      font-size: 16px;
+      font-weight: bold;
+      color: red;
+      text-align: center;
+      line-height: 14px;
+    }
+
+    /* 🚨 Flashing lights */
+    .light-left, .light-right {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      position: absolute;
+      top: -5px;
+      animation: flash 1s infinite;
+    }
+
+    .light-left {
+      left: 10px;
+      background: red;
+    }
+
+    .light-right {
+      right: 10px;
+      background: blue;
+      animation-delay: 0.5s;
+    }
+
+    @keyframes flash {
+      0% { opacity: 1; }
+      50% { opacity: 0.2; }
+      100% { opacity: 1; }
+    }
   </style>
 </head>
 <body>
@@ -25,88 +90,128 @@
 <div class="box">
   <h2>🚦 Traffic Police Control</h2>
 
-  <div class="status" id="status">🔄 Initializing…</div>
-
-  <button onclick="testMap()">🗺 Test Map</button>
-  <button onclick="testSupabase()">☁ Test Supabase</button>
+  <p>
+    <b>Ambulance Location:</b><br>
+    <span id="loc">Detecting location…</span>
+  </p>
 
   <div id="map"></div>
 </div>
 
+<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* ---------------- MAP SETUP ---------------- */
-let map = L.map("map").setView([17.385, 78.4867], 6);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
-  .addTo(map);
-
-let marker = null;
-
-/* ---------------- STATUS HELPER ---------------- */
-function setStatus(msg, ok=true) {
-  const el = document.getElementById("status");
-  el.innerText = msg;
-  el.style.color = ok ? "green" : "red";
-}
-
-/* ---------------- MAP TEST ---------------- */
-function testMap() {
-  const testPos = [17.385, 78.4867]; // Hyderabad
-  if (!marker) {
-    marker = L.marker(testPos).addTo(map);
-  } else {
-    marker.setLatLng(testPos);
-  }
-  map.setView(testPos, 15);
-  setStatus("✅ Map is working");
-}
-
-/* ---------------- SUPABASE SETUP ---------------- */
+/* 🔗 Supabase */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "PASTE_YOUR_ANON_KEY_HERE"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-/* ---------------- SUPABASE TEST ---------------- */
-async function testSupabase() {
-  try {
-    const { data, error } = await supabaseClient
-      .from("alerts")
-      .select("*")
-      .eq("id", 1)
-      .single();
+/* 🗺 Map */
+let map = L.map("map").setView([17.385, 78.4867], 15);
 
-    if (error) {
-      setStatus("❌ Supabase error: " + error.message, false);
-      return;
-    }
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "© OpenStreetMap contributors"
+}).addTo(map);
 
-    if (!data || !data.location) {
-      setStatus("⚠ Supabase connected, but no location data", false);
-      return;
-    }
+/* 🚑 Animated Ambulance Marker */
+const ambulanceIcon = L.divIcon({
+  className: "",
+  html: `
+    <div class="ambulance-box">
+      <div class="light-left"></div>
+      <div class="light-right"></div>
 
+      <div class="ambulance-top">108</div>
+      <div class="ambulance-plus">+</div>
+    </div>
+  `,
+  iconSize: [64, 34],
+  iconAnchor: [32, 17]
+});
+
+let marker = null;
+let lastLatLng = null;
+let lastText = "";
+
+/* 🔄 Fetch, animate & convert to location name */
+async function updateLocation() {
+  const { data } = await supabaseClient
+    .from("alerts")
+    .select("*")
+    .eq("id", 1)
+    .single();
+
+  if (data && data.location) {
     const parts = data.location.split(",");
     const lat = parseFloat(parts[0]);
     const lng = parseFloat(parts[1]);
+    const newLatLng = [lat, lng];
 
+    // Smooth marker movement
     if (!marker) {
-      marker = L.marker([lat, lng]).addTo(map);
+      marker = L.marker(newLatLng, { icon: ambulanceIcon }).addTo(map);
+      map.setView(newLatLng, 16);
+      lastLatLng = newLatLng;
     } else {
-      marker.setLatLng([lat, lng]);
+      animateMarker(lastLatLng, newLatLng);
+      lastLatLng = newLatLng;
     }
-    map.setView([lat, lng], 15);
 
-    setStatus("✅ Supabase + Map working");
-  } catch (e) {
-    setStatus("❌ Network / HTTPS issue", false);
+    // 🔁 Convert lat,lng → location name (only when changed)
+    if (data.location !== lastText) {
+      lastText = data.location;
+
+      const geoRes = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+      );
+      const geoData = await geoRes.json();
+
+      const place =
+        geoData.address.suburb ||
+        geoData.address.neighbourhood ||
+        geoData.address.village ||
+        geoData.address.town ||
+        geoData.address.city ||
+        "Unknown area";
+
+      const city =
+        geoData.address.city ||
+        geoData.address.town ||
+        geoData.address.state ||
+        "";
+
+      document.getElementById("loc").innerText =
+        place + (city ? ", " + city : "");
+    }
   }
 }
 
-/* Auto message */
-setStatus("🟢 Page loaded. Click TEST buttons.");
+/* ✨ Smooth animation */
+function animateMarker(from, to) {
+  let step = 0;
+  const steps = 20;
+
+  const latStep = (to[0] - from[0]) / steps;
+  const lngStep = (to[1] - from[1]) / steps;
+
+  const interval = setInterval(() => {
+    step++;
+    marker.setLatLng([
+      from[0] + latStep * step,
+      from[1] + lngStep * step
+    ]);
+
+    if (step === steps) clearInterval(interval);
+  }, 100);
+}
+
+/* Update every 3 seconds */
+setInterval(updateLocation, 3000);
 </script>
 
 </body>
