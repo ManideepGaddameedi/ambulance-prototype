@@ -4,35 +4,30 @@
   <title>Traffic Police Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: Arial;
       background: #f4f6f9;
     }
-
     .box {
       max-width: 480px;
       margin: 30px auto;
-      background: white;
+      background: #fff;
       padding: 15px;
       border-radius: 10px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.25);
     }
-
     #map {
       height: 400px;
       margin-top: 10px;
       border-radius: 8px;
     }
-
     .eta {
-      margin: 8px 0;
-      font-size: 16px;
       font-weight: bold;
       color: #d32f2f;
+      margin-bottom: 6px;
     }
   </style>
 </head>
@@ -40,14 +35,11 @@
 
 <div class="box">
   <h2>🚦 Traffic Police Control</h2>
-  <div class="eta" id="eta">ETA: calculating…</div>
+  <div class="eta" id="eta">ETA: waiting for ambulance…</div>
   <div id="map"></div>
 </div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
@@ -58,83 +50,77 @@ const supabaseClient = supabase.createClient(
 );
 
 /* 🗺 Map */
-let map = L.map("map").setView([17.385, 78.486], 14);
+const map = L.map("map").setView([17.385, 78.486], 14);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-/* Markers & route */
 let ambulanceMarker = null;
 let destinationMarker = null;
 let routeLine = null;
-let prevLatLng = null;
-let lastRouteKey = "";
+let lastPosition = null;
+let animationTimer = null;
 
-/* 🚑 Smooth movement animation (Zomato-style) */
-function animateMarker(from, to) {
+/* 🚑 Smooth marker movement */
+function moveSmoothly(from, to) {
+  if (animationTimer) clearInterval(animationTimer);
+
   let step = 0;
-  const steps = 30;        // smoothness
-  const intervalTime = 100;
-
+  const steps = 20;
   const latStep = (to[0] - from[0]) / steps;
   const lngStep = (to[1] - from[1]) / steps;
 
-  const interval = setInterval(() => {
+  animationTimer = setInterval(() => {
     step++;
     const lat = from[0] + latStep * step;
     const lng = from[1] + lngStep * step;
     ambulanceMarker.setLatLng([lat, lng]);
 
-    if (step >= steps) clearInterval(interval);
-  }, intervalTime);
+    if (step >= steps) clearInterval(animationTimer);
+  }, 100);
 }
 
-/* 🔄 Fetch GPS, route, ETA */
-async function updateRoute() {
-  const { data, error } = await supabaseClient
+/* 🔄 MAIN UPDATE */
+async function update() {
+  const { data } = await supabaseClient
     .from("alerts")
     .select("location, destination, destination_name")
     .eq("id", 1)
     .single();
 
-  if (error || !data) return;
+  if (!data) return;
 
   const [alat, alng] = data.location.split(",").map(Number);
   const [dlat, dlng] = data.destination.split(",").map(Number);
-  const currentLatLng = [alat, alng];
+  const current = [alat, alng];
 
-  /* 🚑 Ambulance marker */
+  /* Ambulance marker */
   if (!ambulanceMarker) {
-    ambulanceMarker = L.marker(currentLatLng).addTo(map);
-    prevLatLng = currentLatLng;
+    ambulanceMarker = L.marker(current).addTo(map);
+    lastPosition = current;
+    map.setView(current, 15);
   } else {
-    animateMarker(prevLatLng, currentLatLng);
-    prevLatLng = currentLatLng;
+    moveSmoothly(lastPosition, current);
+    lastPosition = current;
   }
 
-  /* 🏥 Destination marker */
+  /* Destination marker */
   if (!destinationMarker) {
     destinationMarker = L.marker([dlat, dlng])
       .addTo(map)
       .bindPopup("🏥 " + data.destination_name);
   }
 
-  /* Avoid repeated route calls */
-  const routeKey = `${alat},${alng}-${dlat},${dlng}`;
-  if (routeKey === lastRouteKey) return;
-  lastRouteKey = routeKey;
-
-  /* 🚗 OSRM Google-style road routing */
+  /* 🚗 OSRM route + ETA */
   const url =
     `https://router.project-osrm.org/route/v1/driving/` +
     `${alng},${alat};${dlng},${dlat}?overview=full&geometries=geojson`;
 
   const res = await fetch(url);
   const json = await res.json();
-  if (!json.routes || !json.routes.length) return;
+  if (!json.routes) return;
 
   const route = json.routes[0];
-
-  /* Draw route */
   const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+
   if (routeLine) {
     routeLine.setLatLngs(coords);
   } else {
@@ -142,11 +128,9 @@ async function updateRoute() {
       color: "red",
       weight: 5
     }).addTo(map);
-
     map.fitBounds(routeLine.getBounds());
   }
 
-  /* ⏱ ETA calculation */
   const etaMin = Math.ceil(route.duration / 60);
   const distKm = (route.distance / 1000).toFixed(1);
   document.getElementById("eta").innerText =
@@ -154,7 +138,7 @@ async function updateRoute() {
 }
 
 /* Update every 4 seconds */
-setInterval(updateRoute, 4000);
+setInterval(update, 4000);
 </script>
 
 </body>
