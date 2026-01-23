@@ -2,12 +2,20 @@
 <html>
 <head>
   <title>Ambulance Device</title>
+  <style>
+    body { font-family: Arial; }
+    button { margin:5px 0; width:100%; }
+  </style>
 </head>
 <body>
 
 <h2>🚑 Ambulance Device</h2>
 
-<p id="gps">GPS: Waiting…</p>
+<p id="gps">GPS: waiting…</p>
+
+<h3>Select Destination Hospital</h3>
+
+<div id="hospitals"></div>
 
 <button onclick="start()">START TRACKING</button>
 
@@ -18,7 +26,27 @@ const supabaseClient = supabase.createClient(
   "YOUR_ANON_KEY"
 );
 
+/* 🏥 STATIC NEARBY HOSPITALS (REAL-WORLD DEMO) */
+const hospitalList = [
+  { name:"Gandhi Hospital", lat:17.4239, lng:78.5019 },
+  { name:"Apollo Hospital", lat:17.4065, lng:78.4772 },
+  { name:"Yashoda Hospital", lat:17.4422, lng:78.4664 }
+];
+
+let selectedHospital = hospitalList[0];
 let watchId = null;
+
+/* Show hospitals */
+const div = document.getElementById("hospitals");
+hospitalList.forEach(h => {
+  const b = document.createElement("button");
+  b.innerText = h.name;
+  b.onclick = () => {
+    selectedHospital = h;
+    alert("Selected: " + h.name);
+  };
+  div.appendChild(b);
+});
 
 function start() {
   if (watchId) return;
@@ -31,12 +59,13 @@ function start() {
       `GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 
     await supabaseClient.from("alerts").upsert({
-      id: 1,
-      location: lat + "," + lng
+      id:1,
+      location: lat + "," + lng,
+      hospital: selectedHospital.name
     });
   },
   () => alert("GPS permission denied"),
-  { enableHighAccuracy: true });
+  { enableHighAccuracy:true });
 }
 </script>
 
