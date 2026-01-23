@@ -1,25 +1,58 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Traffic Police Dashboard</title>
+  <title>Traffic Police</title>
 
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet"
-          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="app.js" defer></script>
+  <style>
+    body { margin:0; font-family:Arial; }
+    #map { height:100vh; }
+    .info {
+      position:absolute; top:10px; left:10px;
+      background:white; padding:10px; z-index:999;
+    }
+  </style>
 </head>
+<body>
 
-<body onload="initPoliceMap()">
-
-<div class="dashboard">
-    <h1>🚓 Traffic Police Control Panel</h1>
-    <p id="info">Waiting for ambulance data...</p>
-</div>
-
+<div class="info" id="info">Waiting for ambulance…</div>
 <div id="map"></div>
+
+<script>
+const supabaseClient = supabase.createClient(
+  "https://inlkqessbewmxmtfvzfe.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
+);
+
+let map = L.map("map").setView([17.3850,78.4867],13);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+const ambulanceIcon = L.divIcon({
+  html:"🚑", iconSize:[40,40], iconAnchor:[20,20]
+});
+
+let marker;
+
+/* POLL SUPABASE */
+setInterval(async () => {
+  const {data} = await supabaseClient.from("alerts").select("*").eq("id",1).single();
+  if (!data) return;
+
+  document.getElementById("info").innerHTML =
+    `<b>Ambulance Live</b><br>${data.time}`;
+
+  if (!marker) {
+    marker = L.marker([data.lat,data.lng],{icon:ambulanceIcon}).addTo(map);
+    map.setView([data.lat,data.lng],16);
+  } else {
+    marker.setLatLng([data.lat,data.lng]);
+  }
+}, 2000);
+</script>
 
 </body>
 </html>
