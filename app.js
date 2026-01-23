@@ -1,14 +1,13 @@
 let map;
 let ambulanceMarker, hospitalMarker, routeLayer;
 
-// ---------------- HOSPITAL DATA ----------------
 const hospitals = [
     { name: "Apollo Hospital", lat: 17.4108, lng: 78.3983 },
     { name: "Care Hospital",   lat: 17.3920, lng: 78.4483 },
     { name: "City Hospital",   lat: 17.3850, lng: 78.4867 }
 ];
 
-// ---------------- DISTANCE (HAVERSINE) ----------------
+// Distance (Haversine)
 function distance(lat1, lon1, lat2, lon2) {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -23,7 +22,7 @@ function distance(lat1, lon1, lat2, lon2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// ---------------- FIND NEAREST HOSPITAL ----------------
+// Nearest hospital
 function findNearestHospital(lat, lng) {
     let nearest = hospitals[0];
     let minDist = distance(lat, lng, nearest.lat, nearest.lng);
@@ -35,15 +34,12 @@ function findNearestHospital(lat, lng) {
             nearest = h;
         }
     });
-
     return nearest;
 }
 
-// ======================================================
-// ================= AMBULANCE SIDE =====================
-// ======================================================
+// ---------------- AMBULANCE ----------------
 function initAmbulanceMap() {
-    map = L.map("map").setView([20.5937, 78.9629], 5);
+    map = L.map("map").setView([17.3850, 78.4867], 12);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OpenStreetMap"
@@ -63,20 +59,15 @@ function startTracking() {
 
         const hospital = findNearestHospital(lat, lng);
         const km = distance(lat, lng, hospital.lat, hospital.lng);
-        const eta = (km / 40 * 60).toFixed(1); // 40 km/h
+        const eta = (km / 40 * 60).toFixed(1);
 
-        // STORE SHARED DATA
         localStorage.setItem("AMB_DATA", JSON.stringify({
-            id,
-            lat,
-            lng,
-            hospital,
+            id, lat, lng, hospital,
             distance: km.toFixed(2),
             eta,
             time: new Date().toLocaleTimeString()
         }));
 
-        // MAP UPDATE
         if (!ambulanceMarker) {
             ambulanceMarker = L.marker([lat, lng]).addTo(map);
         } else {
@@ -85,23 +76,20 @@ function startTracking() {
 
         map.setView([lat, lng], 16);
 
-        // STATUS TEXT
         status.innerHTML =
             `Status: Emergency Active<br>
-             Nearest Hospital: ${hospital.name}<br>
+             Hospital: ${hospital.name}<br>
              Distance: ${km.toFixed(2)} km<br>
-             ETA: ${eta} minutes`;
+             ETA: ${eta} min`;
 
     }, () => alert("Location permission denied"), {
         enableHighAccuracy: true
     });
 }
 
-// ======================================================
-// ================= POLICE SIDE ========================
-// ======================================================
+// ---------------- POLICE ----------------
 function initPoliceMap() {
-    map = L.map("map").setView([20.5937, 78.9629], 5);
+    map = L.map("map").setView([17.3850, 78.4867], 12);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OpenStreetMap"
@@ -116,29 +104,25 @@ async function updatePoliceMap() {
 
     const data = JSON.parse(stored);
 
-    // INFO PANEL
     document.getElementById("info").innerHTML =
         `<b>Ambulance:</b> ${data.id}<br>
          <b>Hospital:</b> ${data.hospital.name}<br>
          <b>Distance:</b> ${data.distance} km<br>
-         <b>ETA:</b> ${data.eta} minutes<br>
+         <b>ETA:</b> ${data.eta} min<br>
          <b>Updated:</b> ${data.time}`;
 
-    // AMBULANCE MARKER
     if (!ambulanceMarker) {
         ambulanceMarker = L.marker([data.lat, data.lng]).addTo(map);
     } else {
         ambulanceMarker.setLatLng([data.lat, data.lng]);
     }
 
-    // HOSPITAL MARKER
     if (!hospitalMarker) {
         hospitalMarker = L.marker([data.hospital.lat, data.hospital.lng])
             .addTo(map)
             .bindPopup("🏥 " + data.hospital.name);
     }
 
-    // ROUTE USING OSRM
     const url =
         `https://router.project-osrm.org/route/v1/driving/` +
         `${data.lng},${data.lat};` +
