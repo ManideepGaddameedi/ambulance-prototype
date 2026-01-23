@@ -30,7 +30,7 @@
 
 <div class="box">
   <h2>🚦 Traffic Police Control</h2>
-  <p><b>Ambulance → Destination Route</b></p>
+  <p><b>Live Ambulance Route</b></p>
   <div id="map"></div>
 </div>
 
@@ -51,7 +51,7 @@ let ambMarker, destMarker, routeLine;
 async function updateRoute() {
   const { data } = await supabaseClient
     .from("alerts")
-    .select("location, destination")
+    .select("location, destination, destination_name")
     .eq("id", 1)
     .single();
 
@@ -62,8 +62,10 @@ async function updateRoute() {
 
   if (!ambMarker) {
     ambMarker = L.marker([alat, alng]).addTo(map);
-    destMarker = L.marker([dlat, dlng]).addTo(map)
-      .bindPopup("🏥 Destination");
+    destMarker = L.marker([dlat, dlng])
+      .addTo(map)
+      .bindPopup("🏥 " + data.destination_name);
+
     routeLine = L.polyline(
       [[alat, alng], [dlat, dlng]],
       { color: "red", weight: 4 }
