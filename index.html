@@ -1,74 +1,42 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Ambulance GPS Sender</title>
-  <meta charset="utf-8" />
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin-top: 40px;
-    }
-    button {
-      padding: 12px 24px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    #status {
-      margin-top: 20px;
-      font-size: 15px;
-      color: green;
-    }
-  </style>
+  <title>Ambulance GPS</title>
+  <meta charset="utf-8">
 </head>
-<body>
+<body style="text-align:center;font-family:Arial;margin-top:40px;">
 
-<h2>🚑 Smart Ambulance – Live GPS</h2>
-<button onclick="startTracking()">Start Sending Location</button>
-<p id="status">Waiting for GPS permission…</p>
+<h2>🚑 Ambulance Live GPS</h2>
+<button onclick="start()">Start GPS</button>
+<p id="msg">Waiting...</p>
 
-<!-- Supabase JS -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
 <script>
-  // ✅ YOUR SUPABASE DETAILS
-  const supabaseUrl = "https://inlkqessbewmxmtfvzfe.supabase.co";
-  const supabaseKey =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0l";
+const supabase = supabase.createClient(
+  "https://inlkqessbewmxmtfvzfe.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0l"
+);
 
-  const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+function start() {
+  navigator.geolocation.watchPosition(async (pos) => {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
 
-  function startTracking() {
-    if (!navigator.geolocation) {
-      alert("Geolocation not supported");
-      return;
-    }
+    document.getElementById("msg").innerText =
+      `Sending: ${lat}, ${lng}`;
 
-    navigator.geolocation.watchPosition(
-      async (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-
-        document.getElementById("status").innerText =
-          "Sending Location: " + lat.toFixed(5) + ", " + lng.toFixed(5);
-
-        // 🔹 Update GPS in Supabase
-        await supabase
-          .from("ambulance_location")
-          .update({
-            latitude: lat,
-            longitude: lng,
-            updated_at: new Date()
-          })
-          .eq("ambulance_id", "AMB001");
-      },
-      (err) => {
-        alert("GPS permission denied");
-        console.error(err);
-      },
-      { enableHighAccuracy: true }
-    );
-  }
+    // ✅ UPSERT (THIS IS THE FIX)
+    await supabase.from("ambulance_location").upsert({
+      ambulance_id: "AMB001",
+      latitude: lat,
+      longitude: lng,
+      updated_at: new Date()
+    });
+  },
+  () => alert("GPS permission denied"),
+  { enableHighAccuracy: true });
+}
 </script>
 
 </body>
