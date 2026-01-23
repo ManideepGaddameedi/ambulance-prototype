@@ -1,28 +1,30 @@
 let map;
 let ambulanceMarker, hospitalMarker, routeLayer;
+let lastLatLng = null;
 
+/* ================= HOSPITAL DATA ================= */
 const hospitals = [
     { name: "Apollo Hospital", lat: 17.4108, lng: 78.3983 },
     { name: "Care Hospital",   lat: 17.3920, lng: 78.4483 },
     { name: "City Hospital",   lat: 17.3850, lng: 78.4867 }
 ];
 
-// Distance (Haversine)
+/* ================= DISTANCE (HAVERSINE) ================= */
 function distance(lat1, lon1, lat2, lon2) {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
 
     const a =
-        Math.sin(dLat/2) ** 2 +
-        Math.cos(lat1 * Math.PI/180) *
-        Math.cos(lat2 * Math.PI/180) *
-        Math.sin(dLon/2) ** 2;
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1 * Math.PI / 180) *
+        Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) ** 2;
 
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Nearest hospital
+/* ================= FIND NEAREST HOSPITAL ================= */
 function findNearestHospital(lat, lng) {
     let nearest = hospitals[0];
     let minDist = distance(lat, lng, nearest.lat, nearest.lng);
@@ -34,10 +36,34 @@ function findNearestHospital(lat, lng) {
             nearest = h;
         }
     });
+
     return nearest;
 }
 
-// ---------------- AMBULANCE ----------------
+/* ================= SMOOTH MARKER MOVEMENT ================= */
+function smoothMoveMarker(marker, from, to) {
+    let steps = 20;
+    let step = 0;
+
+    const latStep = (to[0] - from[0]) / steps;
+    const lngStep = (to[1] - from[1]) / steps;
+
+    const interval = setInterval(() => {
+        step++;
+
+        marker.setLatLng([
+            from[0] + latStep * step,
+            from[1] + lngStep * step
+        ]);
+
+        if (step >= steps) clearInterval(interval);
+    }, 100);
+}
+
+/* ========================================================= */
+/* ================= AMBULANCE SIDE ======================== */
+/* ========================================================= */
+
 function initAmbulanceMap() {
     map = L.map("map").setView([17.3850, 78.4867], 12);
 
@@ -59,35 +85,45 @@ function startTracking() {
 
         const hospital = findNearestHospital(lat, lng);
         const km = distance(lat, lng, hospital.lat, hospital.lng);
-        const eta = (km / 40 * 60).toFixed(1);
+        const eta = (km / 40 * 60).toFixed(1); // 40 km/h avg
 
+        /* STORE DATA (SHARED) */
         localStorage.setItem("AMB_DATA", JSON.stringify({
-            id, lat, lng, hospital,
+            id,
+            lat,
+            lng,
+            hospital,
             distance: km.toFixed(2),
             eta,
             time: new Date().toLocaleTimeString()
         }));
 
+        /* MAP MARKER WITH SMOOTH MOVEMENT */
         if (!ambulanceMarker) {
             ambulanceMarker = L.marker([lat, lng]).addTo(map);
+            lastLatLng = [lat, lng];
         } else {
-            ambulanceMarker.setLatLng([lat, lng]);
+            smoothMoveMarker(ambulanceMarker, lastLatLng, [lat, lng]);
+            lastLatLng = [lat, lng];
         }
 
         map.setView([lat, lng], 16);
 
         status.innerHTML =
             `Status: Emergency Active<br>
-             Hospital: ${hospital.name}<br>
+             Nearest Hospital: ${hospital.name}<br>
              Distance: ${km.toFixed(2)} km<br>
-             ETA: ${eta} min`;
+             ETA: ${eta} minutes`;
 
     }, () => alert("Location permission denied"), {
         enableHighAccuracy: true
     });
 }
 
-// ---------------- POLICE ----------------
+/* ========================================================= */
+/* ================= POLICE SIDE =========================== */
+/* ========================================================= */
+
 function initPoliceMap() {
     map = L.map("map").setView([17.3850, 78.4867], 12);
 
@@ -123,6 +159,7 @@ async function updatePoliceMap() {
             .bindPopup("🏥 " + data.hospital.name);
     }
 
+    /* ROUTE USING OSRM */
     const url =
         `https://router.project-osrm.org/route/v1/driving/` +
         `${data.lng},${data.lat};` +
