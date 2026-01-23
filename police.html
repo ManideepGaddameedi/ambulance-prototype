@@ -1,32 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Traffic Police Control</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
-  <style>
-    body { font-family: Arial; background:#f4f6f9; }
-    .box {
-      max-width:440px; margin:30px auto; background:#fff;
-      padding:15px; border-radius:10px;
-      box-shadow:0 4px 10px rgba(0,0,0,.25);
-    }
-    #map { height:340px; margin-top:10px; border-radius:8px; }
-  </style>
+  <title>Police Control</title>
+  <link rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
 
-<div class="box">
-  <h2>🚦 Traffic Police Control</h2>
+<h2>🚦 Traffic Police Control</h2>
 
-  <p><b>Destination:</b> <span id="dest">--</span></p>
-  <p><b>Distance to Destination:</b> <span id="distance">--</span> km</p>
+<p><b>Destination:</b> <span id="dname">--</span></p>
+<p><b>Distance:</b> <span id="dist">--</span> km</p>
 
-  <div id="map"></div>
-</div>
+<div id="map" style="height:350px;"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -34,81 +20,77 @@
 <script>
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
+  "YOUR_ANON_KEY"
 );
 
-let map = L.map("map").setView([17.385, 78.4867], 13);
+let map = L.map("map").setView([17,78],6);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
   .addTo(map);
 
-let marker = null;
-let destinationLatLng = null;
+let ambMarker;
+let destLatLng = null;
+let lastDest = "";
 
-/* 🔢 Distance formula */
-function calculateDistance(lat1, lon1, lat2, lon2) {
+/* Distance formula */
+function distance(lat1, lon1, lat2, lon2) {
   const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLon = (lon2-lon1)*Math.PI/180;
   const a =
     Math.sin(dLat/2)**2 +
     Math.cos(lat1*Math.PI/180) *
     Math.cos(lat2*Math.PI/180) *
     Math.sin(dLon/2)**2;
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return (R * c).toFixed(2);
+  return (R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))).toFixed(2);
 }
 
-async function updateData() {
+async function load() {
   const { data } = await supabaseClient
-    .from("alerts")
-    .select("*")
-    .eq("id", 1)
-    .single();
+    .from("alerts").select("*").eq("id",1).single();
 
   if (!data || !data.location) return;
 
-  const [lat, lng] = data.location.split(",").map(Number);
+  const [lat,lng] = data.location.split(",").map(Number);
 
-  if (!marker) {
-    marker = L.marker([lat, lng]).addTo(map);
-    map.setView([lat, lng], 15);
+  /* Marker */
+  if (!ambMarker) {
+    ambMarker = L.marker([lat,lng]).addTo(map);
+    map.setView([lat,lng],15);
   } else {
-    marker.setLatLng([lat, lng]);
+    ambMarker.setLatLng([lat,lng]);
   }
 
-  // Destination name
-  if (data.destination) {
-    document.getElementById("dest").innerText = data.destination;
-  }
+  /* Destination name */
+  document.getElementById("dname").innerText =
+    data.destination || "--";
 
-  // Convert destination NAME → lat,lng (once)
-  if (!destinationLatLng && data.destination) {
+  /* Convert destination name → lat/lng (ONLY ONCE) */
+  if (data.destination && data.destination !== lastDest) {
+    lastDest = data.destination;
+
     const geo = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&q=${data.destination}`
-    ).then(r => r.json());
+    ).then(r=>r.json());
 
     if (geo.length > 0) {
-      destinationLatLng = [
+      destLatLng = [
         parseFloat(geo[0].lat),
         parseFloat(geo[0].lon)
       ];
     }
   }
 
-  // Distance calculation
-  if (destinationLatLng) {
-    const dist = calculateDistance(
+  /* Distance */
+  if (destLatLng) {
+    const d = distance(
       lat, lng,
-      destinationLatLng[0],
-      destinationLatLng[1]
+      destLatLng[0], destLatLng[1]
     );
-    document.getElementById("distance").innerText = dist;
+    document.getElementById("dist").innerText = d;
   }
 }
 
-setInterval(updateData, 3000);
+setInterval(load, 3000);
 </script>
 
 </body>
