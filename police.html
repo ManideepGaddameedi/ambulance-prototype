@@ -1,217 +1,96 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Traffic Police Control</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Leaflet CSS -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
-
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f9;
-    }
-    .box {
-      max-width: 440px;
-      margin: 30px auto;
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
-    }
-    #map {
-      height: 340px;
-      margin-top: 10px;
-      border-radius: 8px;
-    }
-
-    /* 🚑 Ambulance vehicle */
-    .ambulance-box {
-      width: 64px;
-      height: 34px;
-      background: white;
-      border: 2px solid red;
-      border-radius: 6px;
-      position: relative;
-      box-shadow: 0 0 8px rgba(0,0,0,0.4);
-      font-family: Arial, sans-serif;
-    }
-
-    .ambulance-top {
-      font-size: 12px;
-      font-weight: bold;
-      color: red;
-      text-align: center;
-      line-height: 12px;
-    }
-
-    .ambulance-plus {
-      font-size: 16px;
-      font-weight: bold;
-      color: red;
-      text-align: center;
-      line-height: 14px;
-    }
-
-    /* 🚨 Flashing lights */
-    .light-left, .light-right {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      position: absolute;
-      top: -5px;
-      animation: flash 1s infinite;
-    }
-
-    .light-left {
-      left: 10px;
-      background: red;
-    }
-
-    .light-right {
-      right: 10px;
-      background: blue;
-      animation-delay: 0.5s;
-    }
-
-    @keyframes flash {
-      0% { opacity: 1; }
-      50% { opacity: 0.2; }
-      100% { opacity: 1; }
-    }
-  </style>
+  <title>Traffic Police Dashboard</title>
+  <link rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
 
-<div class="box">
-  <h2>🚦 Traffic Police Control</h2>
+<h2>🚦 Traffic Police Control</h2>
 
-  <p>
-    <b>Ambulance Location:</b><br>
-    <span id="loc">Detecting location…</span>
-  </p>
+<p><b>Distance:</b> <span id="dist">--</span> km</p>
+<p><b>ETA:</b> <span id="eta">--</span> mins</p>
+<p><b>Intersections:</b> <span id="ints">--</span></p>
 
-  <div id="map"></div>
-</div>
+<div id="map" style="height:400px;"></div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* 🔗 Supabase */
 const supabaseClient = supabase.createClient(
-  "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
+  "https://YOUR_PROJECT.supabase.co",
+  "YOUR_ANON_KEY"
 );
 
-/* 🗺 Map */
-let map = L.map("map").setView([17.385, 78.4867], 15);
+/* 🏥 FIXED HOSPITAL LOCATION (DEMO) */
+const HOSPITAL = [17.3850, 78.4867]; // Example: Hyderabad hospital
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: "© OpenStreetMap contributors"
-}).addTo(map);
+/* 🗺 MAP */
+const map = L.map("map").setView(HOSPITAL, 13);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
+  .addTo(map);
 
-/* 🚑 Animated Ambulance Marker */
-const ambulanceIcon = L.divIcon({
-  className: "",
-  html: `
-    <div class="ambulance-box">
-      <div class="light-left"></div>
-      <div class="light-right"></div>
+L.marker(HOSPITAL).addTo(map).bindPopup("Hospital");
 
-      <div class="ambulance-top">108</div>
-      <div class="ambulance-plus">+</div>
-    </div>
-  `,
-  iconSize: [64, 34],
-  iconAnchor: [32, 17]
-});
+let ambMarker = null;
+let routeLine = null;
 
-let marker = null;
-let lastLatLng = null;
-let lastText = "";
+/* 🌍 DISTANCE FORMULA */
+function distanceKm(a, b) {
+  const R = 6371;
+  const dLat = (b[0]-a[0]) * Math.PI/180;
+  const dLng = (b[1]-a[1]) * Math.PI/180;
+  const x =
+    Math.sin(dLat/2)**2 +
+    Math.cos(a[0]*Math.PI/180) *
+    Math.cos(b[0]*Math.PI/180) *
+    Math.sin(dLng/2)**2;
+  return (R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x)));
+}
 
-/* 🔄 Fetch, animate & convert to location name */
-async function updateLocation() {
+/* 🔄 UPDATE LOOP */
+async function update() {
   const { data } = await supabaseClient
     .from("alerts")
     .select("*")
-    .eq("id", 1)
+    .eq("id",1)
     .single();
 
-  if (data && data.location) {
-    const parts = data.location.split(",");
-    const lat = parseFloat(parts[0]);
-    const lng = parseFloat(parts[1]);
-    const newLatLng = [lat, lng];
+  if (!data || !data.location) return;
 
-    // Smooth marker movement
-    if (!marker) {
-      marker = L.marker(newLatLng, { icon: ambulanceIcon }).addTo(map);
-      map.setView(newLatLng, 16);
-      lastLatLng = newLatLng;
-    } else {
-      animateMarker(lastLatLng, newLatLng);
-      lastLatLng = newLatLng;
-    }
+  const [lat, lng] = data.location.split(",").map(Number);
+  const ambPos = [lat, lng];
 
-    // 🔁 Convert lat,lng → location name (only when changed)
-    if (data.location !== lastText) {
-      lastText = data.location;
-
-      const geoRes = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-      );
-      const geoData = await geoRes.json();
-
-      const place =
-        geoData.address.suburb ||
-        geoData.address.neighbourhood ||
-        geoData.address.village ||
-        geoData.address.town ||
-        geoData.address.city ||
-        "Unknown area";
-
-      const city =
-        geoData.address.city ||
-        geoData.address.town ||
-        geoData.address.state ||
-        "";
-
-      document.getElementById("loc").innerText =
-        place + (city ? ", " + city : "");
-    }
+  /* Marker */
+  if (!ambMarker) {
+    ambMarker = L.marker(ambPos).addTo(map);
+  } else {
+    ambMarker.setLatLng(ambPos);
   }
+
+  /* Route (STRAIGHT LINE) */
+  if (routeLine) map.removeLayer(routeLine);
+  routeLine = L.polyline([ambPos, HOSPITAL], {
+    color: "blue",
+    dashArray: "6,4"
+  }).addTo(map);
+
+  /* Distance + ETA */
+  const dist = distanceKm(ambPos, HOSPITAL);
+  const avgSpeed = 40; // km/h (assumed ambulance speed)
+  const eta = (dist / avgSpeed) * 60;
+
+  document.getElementById("dist").innerText = dist.toFixed(2);
+  document.getElementById("eta").innerText = eta.toFixed(1);
+
+  /* Intersections (SIMULATED) */
+  document.getElementById("ints").innerText =
+    Math.max(1, Math.floor(dist * 2));
 }
 
-/* ✨ Smooth animation */
-function animateMarker(from, to) {
-  let step = 0;
-  const steps = 20;
-
-  const latStep = (to[0] - from[0]) / steps;
-  const lngStep = (to[1] - from[1]) / steps;
-
-  const interval = setInterval(() => {
-    step++;
-    marker.setLatLng([
-      from[0] + latStep * step,
-      from[1] + lngStep * step
-    ]);
-
-    if (step === steps) clearInterval(interval);
-  }, 100);
-}
-
-/* Update every 3 seconds */
-setInterval(updateLocation, 3000);
+setInterval(update, 3000);
 </script>
 
 </body>
