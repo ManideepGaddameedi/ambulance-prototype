@@ -1,70 +1,31 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Ambulance Page</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body { font-family: Arial; background:#f4f6f9; }
-    .box {
-      max-width:420px; margin:40px auto; background:#fff;
-      padding:20px; border-radius:10px;
-      box-shadow:0 4px 10px rgba(0,0,0,.2);
-    }
-    button { width:100%; padding:12px; margin-top:8px; font-size:16px; }
-  </style>
+    <meta charset="UTF-8">
+    <title>Ambulance Live Tracking</title>
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js" defer></script>
 </head>
-<body>
 
-<div class="box">
-  <h2>🚑 Ambulance Device</h2>
+<body onload="initAmbulanceMap()">
 
-  <p id="gps">GPS: Waiting…</p>
+<div class="container">
+    <h1>🚑 Ambulance Dashboard</h1>
 
-  <h3>Select Hospital</h3>
-  <button onclick="selectHospital('Apollo Hospital')">Apollo Hospital</button>
-  <button onclick="selectHospital('Gandhi Hospital')">Gandhi Hospital</button>
+    <label>Ambulance ID</label>
+    <input type="text" id="ambulanceId" value="AMB-01">
 
-  <p>Selected: <span id="selected">None</span></p>
+    <button onclick="startTracking()">🚨 Start Emergency</button>
 
-  <button onclick="startTracking()">▶ START TRACKING</button>
+    <p id="status" class="status idle">Status: Waiting</p>
 </div>
 
-<script>
-const BACKEND = "https://ambulance-backend.onrender.com";
-
-let selectedHospital = null;
-let watchId = null;
-
-function selectHospital(name) {
-  selectedHospital = name;
-  document.getElementById("selected").innerText = name;
-}
-
-function startTracking() {
-  if (!selectedHospital) {
-    alert("Select hospital first");
-    return;
-  }
-
-  watchId = navigator.geolocation.watchPosition(pos => {
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
-
-    document.getElementById("gps").innerText =
-      `GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-
-    fetch(`${BACKEND}/update_location`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        latitude: lat,
-        longitude: lng,
-        hospital: selectedHospital
-      })
-    });
-  });
-}
-</script>
+<div id="map"></div>
 
 </body>
 </html>
