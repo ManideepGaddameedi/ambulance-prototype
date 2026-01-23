@@ -2,70 +2,117 @@
 <html>
 <head>
   <title>Ambulance Device</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { font-family: Arial; }
-    button { margin:5px 0; width:100%; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+    }
+    .box {
+      max-width: 420px;
+      margin: 40px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .status {
+      margin-top: 10px;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
 
-<h2>🚑 Ambulance Device</h2>
+<div class="box">
+  <h2>🚑 Ambulance Device</h2>
 
-<p id="gps">GPS: waiting…</p>
+  <p class="status" id="gpsStatus">GPS: Not started</p>
+  <p class="status" id="sendStatus">Backend: Not sending</p>
 
-<h3>Select Destination Hospital</h3>
+  <h3>Select Destination Hospital</h3>
 
-<div id="hospitals"></div>
+  <button onclick="selectHospital('Gandhi Hospital')">Gandhi Hospital</button>
+  <button onclick="selectHospital('Apollo Hospital')">Apollo Hospital</button>
+  <button onclick="selectHospital('Yashoda Hospital')">Yashoda Hospital</button>
 
-<button onclick="start()">START TRACKING</button>
+  <p><b>Selected:</b> <span id="selected">None</span></p>
 
+  <button onclick="startTracking()">▶ START TRACKING</button>
+</div>
+
+<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script>
+/* 🔗 SUPABASE CONFIG (DO NOT CHANGE TABLE NAME) */
 const supabaseClient = supabase.createClient(
-  "https://YOUR_PROJECT.supabase.co",
-  "YOUR_ANON_KEY"
+  "https://inlkqessbewmxmtfvzfe.supabase.co",
+  "PASTE_YOUR_ANON_KEY_HERE"
 );
 
-/* 🏥 STATIC NEARBY HOSPITALS (REAL-WORLD DEMO) */
-const hospitalList = [
-  { name:"Gandhi Hospital", lat:17.4239, lng:78.5019 },
-  { name:"Apollo Hospital", lat:17.4065, lng:78.4772 },
-  { name:"Yashoda Hospital", lat:17.4422, lng:78.4664 }
-];
-
-let selectedHospital = hospitalList[0];
+let selectedHospital = null;
 let watchId = null;
 
-/* Show hospitals */
-const div = document.getElementById("hospitals");
-hospitalList.forEach(h => {
-  const b = document.createElement("button");
-  b.innerText = h.name;
-  b.onclick = () => {
-    selectedHospital = h;
-    alert("Selected: " + h.name);
-  };
-  div.appendChild(b);
-});
+/* 🏥 Hospital selection */
+function selectHospital(name) {
+  selectedHospital = name;
+  document.getElementById("selected").innerText = name;
+}
 
-function start() {
-  if (watchId) return;
+/* ▶ Start GPS tracking */
+function startTracking() {
+  if (!selectedHospital) {
+    alert("Please select a hospital first");
+    return;
+  }
 
-  watchId = navigator.geolocation.watchPosition(async pos => {
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
+  if (!navigator.geolocation) {
+    alert("Geolocation not supported");
+    return;
+  }
 
-    document.getElementById("gps").innerText =
-      `GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  if (watchId !== null) return;
 
-    await supabaseClient.from("alerts").upsert({
-      id:1,
-      location: lat + "," + lng,
-      hospital: selectedHospital.name
-    });
-  },
-  () => alert("GPS permission denied"),
-  { enableHighAccuracy:true });
+  document.getElementById("gpsStatus").innerText =
+    "GPS: Requesting permission…";
+
+  watchId = navigator.geolocation.watchPosition(
+    async (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      document.getElementById("gpsStatus").innerText =
+        "GPS: Active (" + lat.toFixed(5) + ", " + lng.toFixed(5) + ")";
+
+      const { error } = await supabaseClient
+        .from("alerts")
+        .upsert({
+          id: 1,
+          location: lat + "," + lng,
+          hospital: selectedHospital
+        });
+
+      document.getElementById("sendStatus").innerText =
+        error ? "❌ Backend: Failed" : "✅ Backend: Sent to police";
+    },
+    () => {
+      document.getElementById("gpsStatus").innerText =
+        "❌ GPS permission denied";
+    },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 10000
+    }
+  );
 }
 </script>
 
