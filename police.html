@@ -14,7 +14,7 @@
     .box {
       max-width: 480px;
       margin: 30px auto;
-      background: #fff;
+      background: white;
       padding: 15px;
       border-radius: 10px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.25);
@@ -35,7 +35,7 @@
 
 <div class="box">
   <h2>🚦 Traffic Police Control</h2>
-  <div class="eta" id="eta">ETA: waiting for ambulance…</div>
+  <div class="eta" id="eta">Live Ambulance Tracking</div>
   <div id="map"></div>
 </div>
 
@@ -53,14 +53,19 @@ const supabaseClient = supabase.createClient(
 const map = L.map("map").setView([17.385, 78.486], 14);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
+/* 🚑 Ambulance ICON */
+const ambulanceIcon = L.icon({
+  iconUrl: "ambulance.png",   // 👈 make sure this file exists
+  iconSize: [48, 48],
+  iconAnchor: [24, 24]
+});
+
 let ambulanceMarker = null;
-let destinationMarker = null;
-let routeLine = null;
 let lastPosition = null;
 let animationTimer = null;
 
-/* 🚑 Smooth marker movement */
-function moveSmoothly(from, to) {
+/* 🚑 Smooth movement */
+function moveSmooth(from, to) {
   if (animationTimer) clearInterval(animationTimer);
 
   let step = 0;
@@ -70,75 +75,40 @@ function moveSmoothly(from, to) {
 
   animationTimer = setInterval(() => {
     step++;
-    const lat = from[0] + latStep * step;
-    const lng = from[1] + lngStep * step;
-    ambulanceMarker.setLatLng([lat, lng]);
+    ambulanceMarker.setLatLng([
+      from[0] + latStep * step,
+      from[1] + lngStep * step
+    ]);
 
     if (step >= steps) clearInterval(animationTimer);
   }, 100);
 }
 
-/* 🔄 MAIN UPDATE */
+/* 🔄 Fetch live GPS */
 async function update() {
   const { data } = await supabaseClient
     .from("alerts")
-    .select("location, destination, destination_name")
+    .select("location")
     .eq("id", 1)
     .single();
 
-  if (!data) return;
+  if (!data || !data.location) return;
 
-  const [alat, alng] = data.location.split(",").map(Number);
-  const [dlat, dlng] = data.destination.split(",").map(Number);
-  const current = [alat, alng];
+  const [lat, lng] = data.location.split(",").map(Number);
+  const current = [lat, lng];
 
-  /* Ambulance marker */
   if (!ambulanceMarker) {
-    ambulanceMarker = L.marker(current).addTo(map);
+    ambulanceMarker = L.marker(current, { icon: ambulanceIcon }).addTo(map);
     lastPosition = current;
     map.setView(current, 15);
   } else {
-    moveSmoothly(lastPosition, current);
+    moveSmooth(lastPosition, current);
     lastPosition = current;
   }
-
-  /* Destination marker */
-  if (!destinationMarker) {
-    destinationMarker = L.marker([dlat, dlng])
-      .addTo(map)
-      .bindPopup("🏥 " + data.destination_name);
-  }
-
-  /* 🚗 OSRM route + ETA */
-  const url =
-    `https://router.project-osrm.org/route/v1/driving/` +
-    `${alng},${alat};${dlng},${dlat}?overview=full&geometries=geojson`;
-
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.routes) return;
-
-  const route = json.routes[0];
-  const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-
-  if (routeLine) {
-    routeLine.setLatLngs(coords);
-  } else {
-    routeLine = L.polyline(coords, {
-      color: "red",
-      weight: 5
-    }).addTo(map);
-    map.fitBounds(routeLine.getBounds());
-  }
-
-  const etaMin = Math.ceil(route.duration / 60);
-  const distKm = (route.distance / 1000).toFixed(1);
-  document.getElementById("eta").innerText =
-    `ETA: ${etaMin} min (${distKm} km)`;
 }
 
-/* Update every 4 seconds */
-setInterval(update, 4000);
+/* Update every 3 seconds */
+setInterval(update, 3000);
 </script>
 
 </body>
