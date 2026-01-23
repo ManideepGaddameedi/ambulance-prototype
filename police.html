@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Traffic Police Control</title>
+  <title>Police Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -12,34 +12,21 @@
       background: #f4f6f9;
     }
     .box {
-      max-width: 520px;
+      max-width: 500px;
       margin: 30px auto;
-      background: white;
+      background: #fff;
       padding: 15px;
       border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
     }
     #map {
-      height: 440px;
-      margin-top: 10px;
-      border-radius: 8px;
-    }
-
-    .amb-icon {
-      width: 42px;
-      height: 42px;
-      background-size: contain;
-      background-repeat: no-repeat;
-      transform-origin: center center;
-      transition: transform 0.2s linear;
+      height: 420px;
     }
   </style>
 </head>
 <body>
 
 <div class="box">
-  <h2>🚦 Traffic Police Control</h2>
-  <p>Multiple Ambulances – Live Tracking</p>
+  <h2>🚦 Police Dashboard</h2>
   <div id="map"></div>
 </div>
 
@@ -47,120 +34,45 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* 🔗 Supabase */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-/* 🗺 Map */
 const map = L.map("map").setView([17.385, 78.486], 13);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-/* Store all ambulances */
-const ambulances = {};
+const icons = {
+  1: L.icon({ iconUrl: "ambulance1.png", iconSize: [40,40] }),
+  2: L.icon({ iconUrl: "ambulance2.png", iconSize: [40,40] }),
+  3: L.icon({ iconUrl: "ambulance3.png", iconSize: [40,40] })
+};
 
-/* 🧭 Bearing */
-function getBearing(from, to) {
-  const lat1 = from[0] * Math.PI / 180;
-  const lat2 = to[0] * Math.PI / 180;
-  const dLon = (to[1] - from[1]) * Math.PI / 180;
+const markers = {};
 
-  const y = Math.sin(dLon) * Math.cos(lat2);
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-
-  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-}
-
-/* 🚑 Smooth movement */
-function moveSmooth(amb, from, to) {
-  if (amb.timer) clearInterval(amb.timer);
-
-  const angle = getBearing(from, to);
-  amb.iconEl.style.transform = `rotate(${angle}deg)`;
-
-  let step = 0;
-  const steps = 20;
-  const latStep = (to[0] - from[0]) / steps;
-  const lngStep = (to[1] - from[1]) / steps;
-
-  amb.timer = setInterval(() => {
-    step++;
-    amb.marker.setLatLng([
-      from[0] + latStep * step,
-      from[1] + lngStep * step
-    ]);
-    if (step >= steps) clearInterval(amb.timer);
-  }, 100);
-}
-
-/* 🔄 Update all ambulances */
 async function update() {
   const { data } = await supabaseClient
     .from("alerts")
-    .select("*");
+    .select("id, location");
 
   if (!data) return;
 
   data.forEach(row => {
-    const [alat, alng] = row.location.split(",").map(Number);
-    const [dlat, dlng] = row.destination.split(",").map(Number);
-    const current = [alat, alng];
+    if (!row.location) return;
 
-    /* New ambulance */
-    if (!ambulances[row.ambulance_id]) {
-      const iconHtml = `<div class="amb-icon" style="background-image:url('${row.icon}')"></div>`;
-      const icon = L.divIcon({
-        className: "",
-        html: iconHtml,
-        iconSize: [42, 42],
-        iconAnchor: [21, 21]
-      });
+    const [lat, lng] = row.location.split(",").map(Number);
 
-      const marker = L.marker(current, { icon }).addTo(map);
-      const destMarker = L.marker([dlat, dlng])
-        .addTo(map)
-        .bindPopup("🏥 " + row.destination_name);
-
-      const routeLine = L.polyline([], {
-        color: "red",
-        weight: 4
+    if (!markers[row.id]) {
+      markers[row.id] = L.marker([lat, lng], {
+        icon: icons[row.id]
       }).addTo(map);
-
-      ambulances[row.ambulance_id] = {
-        marker,
-        destMarker,
-        routeLine,
-        lastPos: current,
-        iconEl: marker.getElement().querySelector(".amb-icon"),
-        timer: null
-      };
+    } else {
+      markers[row.id].setLatLng([lat, lng]);
     }
-
-    const amb = ambulances[row.ambulance_id];
-
-    /* Move */
-    moveSmooth(amb, amb.lastPos, current);
-    amb.lastPos = current;
-
-    /* Route */
-    fetch(
-      `https://router.project-osrm.org/route/v1/driving/` +
-      `${alng},${alat};${dlng},${dlat}?overview=full&geometries=geojson`
-    )
-    .then(r => r.json())
-    .then(json => {
-      if (!json.routes) return;
-      const coords = json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-      amb.routeLine.setLatLngs(coords);
-    });
   });
 }
 
-/* Update every 4 sec */
-setInterval(update, 4000);
+setInterval(update, 3000);
 </script>
 
 </body>
