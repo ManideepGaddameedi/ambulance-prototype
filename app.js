@@ -28,6 +28,7 @@ function distance(lat1, lon1, lat2, lon2) {
 function findNearestHospital(lat, lng) {
     let nearest = hospitals[0];
     let minDist = distance(lat, lng, nearest.lat, nearest.lng);
+
     hospitals.forEach(h => {
         const d = distance(lat, lng, h.lat, h.lng);
         if (d < minDist) {
@@ -38,10 +39,7 @@ function findNearestHospital(lat, lng) {
     return nearest;
 }
 
-/* ================================================= */
 /* ================= AMBULANCE SIDE ================= */
-/* ================================================= */
-
 function initAmbulanceMap() {
     map = L.map("map").setView([17.3850, 78.4867], 13);
 
@@ -71,13 +69,11 @@ function startTracking() {
              Distance: ${km.toFixed(2)} km<br>
              ETA: ${eta} minutes`;
 
-        // Ambulance marker
         ambulanceMarker = L.marker([lat, lng]).addTo(map);
         hospitalMarker = L.marker([hospital.lat, hospital.lng])
             .addTo(map)
             .bindPopup("🏥 " + hospital.name);
 
-        // ---------------- GET ROUTE ----------------
         const url =
             `https://router.project-osrm.org/route/v1/driving/` +
             `${lng},${lat};${hospital.lng},${hospital.lat}` +
@@ -91,7 +87,6 @@ function startTracking() {
 
         routeIndex = 0;
 
-        // Draw route
         routeLayer = L.polyline(routePoints, {
             color: "red",
             weight: 5
@@ -99,7 +94,6 @@ function startTracking() {
 
         map.fitBounds(routeLayer.getBounds());
 
-        // Store for police page
         localStorage.setItem("AMB_DATA", JSON.stringify({
             id,
             hospital,
@@ -108,7 +102,6 @@ function startTracking() {
             route: routePoints
         }));
 
-        // Start animation
         moving = true;
         moveAlongRoute();
 
@@ -124,7 +117,6 @@ function moveAlongRoute() {
     const point = routePoints[routeIndex];
     ambulanceMarker.setLatLng(point);
 
-    // Update police live position
     const stored = JSON.parse(localStorage.getItem("AMB_DATA"));
     stored.lat = point[0];
     stored.lng = point[1];
@@ -132,15 +124,10 @@ function moveAlongRoute() {
     localStorage.setItem("AMB_DATA", JSON.stringify(stored));
 
     routeIndex++;
-
-    // Speed control (lower = faster)
     setTimeout(moveAlongRoute, 300);
 }
 
-/* ================================================= */
-/* ================= POLICE SIDE =================== */
-/* ================================================= */
-
+/* ================= POLICE SIDE ================= */
 function initPoliceMap() {
     map = L.map("map").setView([17.3850, 78.4867], 13);
 
@@ -181,7 +168,6 @@ function updatePoliceMap() {
             color: "red",
             weight: 5
         }).addTo(map);
-
         map.fitBounds(routeLayer.getBounds());
     }
 }
