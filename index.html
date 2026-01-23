@@ -24,7 +24,7 @@
       cursor: pointer;
     }
     .status {
-      margin-top: 10px;
+      margin-top: 8px;
       font-weight: bold;
     }
   </style>
@@ -43,25 +43,25 @@
   <button onclick="selectHospital('Apollo Hospital')">Apollo Hospital</button>
   <button onclick="selectHospital('Yashoda Hospital')">Yashoda Hospital</button>
 
-  <p><b>Selected:</b> <span id="selected">None</span></p>
+  <p><b>Selected Hospital:</b> <span id="selected">None</span></p>
 
   <button onclick="startTracking()">▶ START TRACKING</button>
 </div>
 
-<!-- Supabase -->
+<!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* 🔗 SUPABASE CONFIG (DO NOT CHANGE TABLE NAME) */
+/* ✅ SUPABASE CONFIG — ALREADY FILLED */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "PASTE_YOUR_ANON_KEY_HERE"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
 let selectedHospital = null;
 let watchId = null;
 
-/* 🏥 Hospital selection */
+/* 🏥 Select hospital */
 function selectHospital(name) {
   selectedHospital = name;
   document.getElementById("selected").innerText = name;
@@ -101,7 +101,9 @@ function startTracking() {
         });
 
       document.getElementById("sendStatus").innerText =
-        error ? "❌ Backend: Failed" : "✅ Backend: Sent to police";
+        error
+          ? "❌ Backend: Failed"
+          : "✅ Backend: Sent to police";
     },
     () => {
       document.getElementById("gpsStatus").innerText =
