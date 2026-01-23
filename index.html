@@ -3,122 +3,102 @@
 <head>
   <title>Ambulance Device</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Leaflet -->
-  <link rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- Supabase -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <style>
-    body { font-family: Arial; background:#f4f6f9; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+    }
     .box {
       max-width: 420px;
-      margin: 20px auto;
+      margin: 40px auto;
       background: white;
       padding: 20px;
       border-radius: 10px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
       text-align: center;
     }
-    button { width:100%; padding:12px; margin-top:10px; }
-    input { width:100%; padding:8px; margin-top:10px; }
-    #map { height: 60vh; margin-top:10px; }
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
 
 <div class="box">
   <h2>🚑 Ambulance Device</h2>
-  <input type="text" id="location" readonly>
+
+  <input type="text" id="location" placeholder="Tracking location..." readonly>
+
   <button onclick="startTracking()">▶ START TRACKING</button>
   <button onclick="stopTracking()">⛔ STOP TRACKING</button>
+
   <p id="msg"></p>
 </div>
 
-<div id="map"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* ================= SUPABASE ================= */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-/* ================= MAP ================= */
-let map = L.map("map").setView([17.3850, 78.4867], 13);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-
-const ambulanceIcon = L.divIcon({
-  html:"🚑",
-  iconSize:[40,40],
-  iconAnchor:[20,20]
-});
-
-let ambulanceMarker = null;
-let hospitalMarker = null;
-let routeLayer = null;
 let watchId = null;
-let routeDrawn = false;
 
-/* SAMPLE DESTINATION HOSPITAL */
-const hospital = {
-  name: "City Hospital",
-  lat: 17.3850,
-  lng: 78.4867
-};
-
-/* ▶ START TRACKING */
+// ▶ Start real-time tracking
 function startTracking() {
-  watchId = navigator.geolocation.watchPosition(async pos => {
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
+  if (!navigator.geolocation) {
+    alert("Geolocation not supported");
+    return;
+  }
 
-    document.getElementById("location").value = lat + "," + lng;
+  watchId = navigator.geolocation.watchPosition(
+    async (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      const locText = lat + "," + lng;
 
-    /* CREATE / MOVE AMBULANCE MARKER */
-    if (!ambulanceMarker) {
-      ambulanceMarker = L.marker([lat,lng],{icon:ambulanceIcon}).addTo(map);
-      map.setView([lat,lng],16);
+      document.getElementById("location").value = locText;
 
-      hospitalMarker = L.marker([hospital.lat,hospital.lng])
-        .addTo(map).bindPopup("🏥 "+hospital.name);
+      await supabaseClient
+        .from("alerts")
+        .upsert({
+          id: 1,
+          location: locText,
+          time: new Date().toLocaleTimeString()
+        });
 
-      drawRoute(lat,lng);
-    } else {
-      ambulanceMarker.setLatLng([lat,lng]);
+      document.getElementById("msg").innerText =
+        "📍 Tracking live location...";
+    },
+    () => {
+      alert("Location permission denied");
+    },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 5000
     }
-
-    /* SEND LIVE GPS */
-    await supabaseClient.from("alerts").upsert({
-      id:1, lat, lng, time:new Date().toLocaleTimeString()
-    });
-
-    document.getElementById("msg").innerText="📍 Live tracking…";
-
-  }, ()=>alert("GPS denied"), { enableHighAccuracy:true });
+  );
 }
 
-/* DRAW ROUTE ONLY ONCE */
-async function drawRoute(lat,lng){
-  if(routeDrawn) return;
-  routeDrawn=true;
-
-  const url=`https://router.project-osrm.org/route/v1/driving/${lng},${lat};${hospital.lng},${hospital.lat}?overview=full&geometries=geojson`;
-  const res=await fetch(url);
-  const json=await res.json();
-
-  const pts=json.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
-  routeLayer=L.polyline(pts,{color:"red",weight:5}).addTo(map);
-  map.fitBounds(routeLayer.getBounds());
-}
-
-/* ⛔ STOP */
-function stopTracking(){
-  navigator.geolocation.clearWatch(watchId);
-  document.getElementById("msg").innerText="⛔ Tracking stopped";
+// ⛔ Stop tracking
+function stopTracking() {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    document.getElementById("msg").innerText =
+      "⛔ Tracking stopped";
+  }
 }
 </script>
 
