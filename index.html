@@ -18,7 +18,7 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
       text-align: center;
     }
-    input, button {
+    input, select, button {
       width: 100%;
       padding: 10px;
       margin-top: 10px;
@@ -33,6 +33,11 @@
       background: #444;
       color: white;
     }
+    .hint {
+      font-size: 13px;
+      color: #555;
+      margin-top: 6px;
+    }
   </style>
 </head>
 <body>
@@ -40,18 +45,26 @@
 <div class="box">
   <h2>🚑 Ambulance Device</h2>
 
-  <!-- Destination input (PRESERVED) -->
+  <!-- Manual destination -->
   <input
     id="destinationName"
-    placeholder="Destination (e.g. Gandhi Hospital Hyderabad)"
+    placeholder="Enter destination manually (optional)"
   >
+
+  <!-- Nearest hospitals -->
+  <select id="hospitalList">
+    <option value="">📍 Select nearest hospital</option>
+  </select>
+
+  <div class="hint">
+    Tip: Select a nearby hospital for faster emergency response
+  </div>
 
   <input id="location" placeholder="Live GPS location" readonly>
 
   <button onclick="startTracking()">▶ START TRACKING</button>
   <button onclick="stopTracking()">⛔ STOP TRACKING</button>
 
-  <!-- 🚨 Emergency (ADDED ONLY) -->
   <button class="emergency" onclick="sendEmergency()">🚨 EMERGENCY ALERT</button>
   <button class="cancel" onclick="cancelEmergency()">❌ CANCEL ALERT</button>
 
@@ -69,47 +82,73 @@ const supabaseClient = supabase.createClient(
 let watchId = null;
 let destinationLatLng = null;
 
-/* Convert destination name → lat,lng */
-async function geocode(place) {
-  const res = await fetch(
-    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}`
-  );
-  const data = await res.json();
-  if (!data.length) return null;
-  return `${data[0].lat},${data[0].lon}`;
+/* 🔍 Fetch nearby hospitals */
+async function loadNearbyHospitals(lat, lng) {
+  const url =
+    `https://nominatim.openstreetmap.org/search?` +
+    `format=json&amenity=hospital&limit=5&` +
+    `lat=${lat}&lon=${lng}`;
+
+  const res = await fetch(url);
+  const hospitals = await res.json();
+
+  const list = document.getElementById("hospitalList");
+  list.innerHTML = `<option value="">📍 Select nearest hospital</option>`;
+
+  hospitals.forEach(h => {
+    const opt = document.createElement("option");
+    opt.value = `${h.lat},${h.lon}`;
+    opt.text =
+      h.display_name.split(",")[0];
+    list.appendChild(opt);
+  });
 }
 
-/* Start tracking */
-async function startTracking() {
-  const destName = document.getElementById("destinationName").value.trim();
-  if (!destName) {
-    alert("Enter destination name");
-    return;
-  }
+/* When hospital selected */
+document.getElementById("hospitalList").addEventListener("change", async e => {
+  if (!e.target.value) return;
 
-  destinationLatLng = await geocode(destName);
-  if (!destinationLatLng) {
-    alert("Destination not found");
-    return;
-  }
+  destinationLatLng = e.target.value;
+  const name = e.target.options[e.target.selectedIndex].text;
+
+  document.getElementById("destinationName").value = name;
 
   await supabaseClient
     .from("alerts")
     .update({
       destination: destinationLatLng,
-      destination_name: destName
+      destination_name: name
     })
     .eq("id", 1);
 
+  document.getElementById("msg").innerText =
+    "🏥 Destination set to " + name;
+});
+
+/* ▶ Start tracking */
+function startTracking() {
+  if (!navigator.geolocation) {
+    alert("Geolocation not supported");
+    return;
+  }
+
   watchId = navigator.geolocation.watchPosition(
     async pos => {
-      const loc = `${pos.coords.latitude},${pos.coords.longitude}`;
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const loc = `${lat},${lng}`;
+
       document.getElementById("location").value = loc;
 
       await supabaseClient
         .from("alerts")
         .update({ location: loc })
         .eq("id", 1);
+
+      // Load hospitals only once (first GPS fix)
+      if (!destinationLatLng) {
+        loadNearbyHospitals(lat, lng);
+      }
 
       document.getElementById("msg").innerText =
         "📍 Tracking live location...";
@@ -119,16 +158,17 @@ async function startTracking() {
   );
 }
 
-/* Stop tracking */
+/* ⛔ Stop tracking */
 function stopTracking() {
   if (watchId) {
     navigator.geolocation.clearWatch(watchId);
     watchId = null;
-    document.getElementById("msg").innerText = "⛔ Tracking stopped";
+    document.getElementById("msg").innerText =
+      "⛔ Tracking stopped";
   }
 }
 
-/* 🚨 Emergency ON */
+/* 🚨 Emergency */
 async function sendEmergency() {
   await supabaseClient
     .from("alerts")
@@ -139,7 +179,6 @@ async function sendEmergency() {
     "🚨 Emergency alert sent";
 }
 
-/* ❌ Emergency OFF */
 async function cancelEmergency() {
   await supabaseClient
     .from("alerts")
