@@ -3,21 +3,16 @@
 <head>
   <title>Ambulance Device</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <style>
-    body { font-family: Arial; background:#f4f6f9; }
-    .box {
-      max-width:420px; margin:40px auto; background:white;
-      padding:20px; border-radius:10px;
-      box-shadow:0 4px 10px rgba(0,0,0,.2);
-      text-align:center;
-    }
-    select,input,button {
-      width:100%; padding:10px; margin-top:10px; font-size:16px;
-    }
-    .emergency { background:red; color:white; font-weight:bold; }
-    .cancel { background:#444; color:white; }
-    .hint { font-size:13px; color:#555; margin-top:6px; }
+    body{font-family:Arial;background:#f4f6f9}
+    .box{max-width:420px;margin:40px auto;background:#fff;
+      padding:20px;border-radius:10px;
+      box-shadow:0 4px 10px rgba(0,0,0,.2);text-align:center}
+    select,input,button{
+      width:100%;padding:10px;margin-top:10px;font-size:16px}
+    .emergency{background:red;color:#fff;font-weight:bold}
+    .cancel{background:#444;color:#fff}
+    .hint{font-size:13px;color:#555;margin-top:6px}
   </style>
 </head>
 <body>
@@ -28,10 +23,7 @@
   <select id="hospitalList">
     <option value="">🏥 Select nearest hospital</option>
   </select>
-
-  <div class="hint">
-    Hospitals are auto-sorted by nearest distance
-  </div>
+  <div class="hint">Hospitals are auto-sorted by nearest distance</div>
 
   <input id="location" placeholder="Live GPS location" readonly>
 
@@ -48,24 +40,24 @@
 <script>
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "YOUR_ANON_KEY"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
 let watchId=null;
 let hospitals=[];
 
-/* Distance calc (for sorting only) */
-function distanceKm(a,b,c,d){
+/* distance only for sorting */
+function dist(a,b,c,d){
   const R=6371;
   const dLat=(c-a)*Math.PI/180;
   const dLon=(d-b)*Math.PI/180;
-  const x=Math.sin(dLat/2)**2 +
+  const x=Math.sin(dLat/2)**2+
     Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*
     Math.sin(dLon/2)**2;
   return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
 }
 
-/* Load hospitals (Overpass API – Nellore) */
+/* load hospitals */
 async function loadHospitals(){
   const q=`[out:json];
     node["amenity"="hospital"](14.399,79.941,14.470,80.021);
@@ -79,25 +71,22 @@ async function loadHospitals(){
 }
 loadHospitals();
 
-/* Update dropdown order */
-function updateHospitalList(lat,lon){
+/* update dropdown */
+function updateHospitals(lat,lon){
   if(!hospitals.length) return;
-  hospitals.forEach(h=>{
-    h.dist=distanceKm(lat,lon,h.lat,h.lon);
-  });
-  hospitals.sort((a,b)=>a.dist-b.dist);
-
-  const list=document.getElementById("hospitalList");
-  list.innerHTML=`<option value="">🏥 Select nearest hospital</option>`;
+  hospitals.forEach(h=>h.d=dist(lat,lon,h.lat,h.lon));
+  hospitals.sort((a,b)=>a.d-b.d);
+  hospitalList.innerHTML=
+    `<option value="">🏥 Select nearest hospital</option>`;
   hospitals.slice(0,10).forEach(h=>{
     const o=document.createElement("option");
     o.value=`${h.lat},${h.lon}`;
-    o.text=`${h.name}`;
-    list.appendChild(o);
+    o.text=h.name;
+    hospitalList.appendChild(o);
   });
 }
 
-/* Destination selection */
+/* destination change */
 hospitalList.onchange=async e=>{
   if(!e.target.value) return;
   await supabaseClient.from("alerts").update({
@@ -107,24 +96,26 @@ hospitalList.onchange=async e=>{
   msg.innerText="🏥 Destination updated";
 };
 
-/* GPS */
+/* gps */
 function startTracking(){
+  if(!navigator.geolocation){
+    alert("Geolocation not supported");return;
+  }
   watchId=navigator.geolocation.watchPosition(async p=>{
     const loc=`${p.coords.latitude},${p.coords.longitude}`;
     location.value=loc;
     await supabaseClient.from("alerts")
       .update({location:loc}).eq("id",1);
-    updateHospitalList(p.coords.latitude,p.coords.longitude);
+    updateHospitals(p.coords.latitude,p.coords.longitude);
     msg.innerText="📍 Tracking live location...";
   },()=>alert("GPS denied"),{enableHighAccuracy:true});
 }
-
 function stopTracking(){
-  if(watchId){navigator.geolocation.clearWatch(watchId);}
+  if(watchId)navigator.geolocation.clearWatch(watchId);
   msg.innerText="⛔ Tracking stopped";
 }
 
-/* Emergency */
+/* emergency */
 async function sendEmergency(){
   await supabaseClient.from("alerts")
     .update({emergency:true}).eq("id",1);
