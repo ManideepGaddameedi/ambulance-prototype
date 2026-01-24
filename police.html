@@ -4,7 +4,6 @@
   <title>Traffic Police Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet CSS -->
   <link rel="stylesheet"
         href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
@@ -13,7 +12,6 @@
       font-family: Arial, sans-serif;
       background: #f4f6f9;
     }
-
     .box {
       max-width: 500px;
       margin: 20px auto;
@@ -22,20 +20,16 @@
       border-radius: 10px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.25);
     }
-
     #map {
       height: 400px;
       margin-top: 10px;
       border-radius: 8px;
     }
-
     .eta {
       font-weight: bold;
       color: #d32f2f;
       margin-bottom: 6px;
     }
-
-    /* 🚨 Emergency alert banner */
     #alertBox {
       display: none;
       background: red;
@@ -47,57 +41,9 @@
       margin-bottom: 10px;
       animation: blink 1s infinite;
     }
-
     @keyframes blink {
       0% { opacity: 1; }
       50% { opacity: 0.6; }
-      100% { opacity: 1; }
-    }
-
-    /* 🚑 Ambulance wrapper */
-    .ambulance-wrapper {
-      width: 42px;
-      height: 42px;
-      position: relative;
-      transform-origin: center center;
-      transition: transform 0.2s linear;
-    }
-
-    /* 🚑 Ambulance image */
-    .ambulance-body {
-      width: 42px;
-      height: 42px;
-      background: url("ambulance.png") no-repeat center;
-      background-size: contain;
-      position: absolute;
-      z-index: 2;
-    }
-
-    /* 🚨 Siren lights */
-    .siren {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      position: absolute;
-      top: -4px;
-      animation: flash 0.6s infinite;
-      z-index: 1;
-    }
-
-    .siren.red {
-      left: 8px;
-      background: red;
-    }
-
-    .siren.blue {
-      right: 8px;
-      background: blue;
-      animation-delay: 0.3s;
-    }
-
-    @keyframes flash {
-      0% { opacity: 1; }
-      50% { opacity: 0.2; }
       100% { opacity: 1; }
     }
   </style>
@@ -107,7 +53,7 @@
 <div class="box">
   <h2>🚦 Traffic Police Control</h2>
 
-  <!-- 🚨 Emergency Alert -->
+  <!-- 🚨 Emergency Alert (ADDED) -->
   <div id="alertBox">
     🚨 EMERGENCY AMBULANCE APPROACHING – CLEAR TRAFFIC 🚨
   </div>
@@ -116,90 +62,32 @@
   <div id="map"></div>
 </div>
 
-<!-- Alarm sound -->
 <audio id="sirenSound" loop>
   <source src="https://actions.google.com/sounds/v1/alarms/emergency_alarm.ogg">
 </audio>
 
-<!-- Leaflet -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* 🔗 Supabase */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-/* 🗺 Map */
+/* Map */
 const map = L.map("map").setView([17.385, 78.486], 14);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
-  .addTo(map);
-
-/* 🚑 Ambulance icon */
-const ambulanceIcon = L.divIcon({
-  className: "",
-  html: `
-    <div class="ambulance-wrapper" id="ambWrap">
-      <div class="siren red"></div>
-      <div class="siren blue"></div>
-      <div class="ambulance-body"></div>
-    </div>
-  `,
-  iconSize: [42, 42],
-  iconAnchor: [21, 21]
-});
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
 let ambMarker = null;
-let destMarker = null;
 let routeLine = null;
-let lastPos = null;
-let animTimer = null;
-let alertActive = false;
+let emergencyActive = false;
 
-/* 🧭 Bearing */
-function getBearing(from, to) {
-  const lat1 = from[0] * Math.PI / 180;
-  const lat2 = to[0] * Math.PI / 180;
-  const dLon = (to[1] - from[1]) * Math.PI / 180;
-  const y = Math.sin(dLon) * Math.cos(lat2);
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-}
-
-/* 🚑 Smooth movement */
-function moveSmooth(from, to) {
-  if (animTimer) clearInterval(animTimer);
-
-  const angle = getBearing(from, to);
-  const wrap = document.getElementById("ambWrap");
-  if (wrap) wrap.style.transform = `rotate(${angle}deg)`;
-
-  let step = 0;
-  const steps = 20;
-  const latStep = (to[0] - from[0]) / steps;
-  const lngStep = (to[1] - from[1]) / steps;
-
-  animTimer = setInterval(() => {
-    step++;
-    ambMarker.setLatLng([
-      from[0] + latStep * step,
-      from[1] + lngStep * step
-    ]);
-    if (step >= steps) clearInterval(animTimer);
-  }, 100);
-}
-
-/* 🔄 Update map + ETA */
+/* Map + ETA update */
 async function updateMap() {
   const { data } = await supabaseClient
     .from("alerts")
-    .select("location, destination, destination_name")
+    .select("location, destination")
     .eq("id", 1)
     .single();
 
@@ -207,21 +95,11 @@ async function updateMap() {
 
   const [alat, alng] = data.location.split(",").map(Number);
   const [dlat, dlng] = data.destination.split(",").map(Number);
-  const current = [alat, alng];
 
   if (!ambMarker) {
-    ambMarker = L.marker(current, { icon: ambulanceIcon }).addTo(map);
-    lastPos = current;
-    map.setView(current, 15);
+    ambMarker = L.marker([alat, alng]).addTo(map);
   } else {
-    moveSmooth(lastPos, current);
-    lastPos = current;
-  }
-
-  if (!destMarker) {
-    destMarker = L.marker([dlat, dlng])
-      .addTo(map)
-      .bindPopup("🏥 " + (data.destination_name || "Destination"));
+    ambMarker.setLatLng([alat, alng]);
   }
 
   const url =
@@ -235,23 +113,17 @@ async function updateMap() {
   const route = json.routes[0];
   const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
 
-  if (routeLine) {
-    routeLine.setLatLngs(coords);
+  if (!routeLine) {
+    routeLine = L.polyline(coords, { color: "red", weight: 5 }).addTo(map);
   } else {
-    routeLine = L.polyline(coords, {
-      color: "red",
-      weight: 5
-    }).addTo(map);
-    map.fitBounds(routeLine.getBounds());
+    routeLine.setLatLngs(coords);
   }
 
-  const etaMin = Math.ceil(route.duration / 60);
-  const distKm = (route.distance / 1000).toFixed(1);
   document.getElementById("eta").innerText =
-    `ETA: ${etaMin} min (${distKm} km)`;
+    `ETA: ${Math.ceil(route.duration/60)} min`;
 }
 
-/* 🚨 Emergency alert */
+/* 🚨 Emergency alert check */
 async function checkEmergency() {
   const { data } = await supabaseClient
     .from("alerts")
@@ -264,24 +136,21 @@ async function checkEmergency() {
   const alertBox = document.getElementById("alertBox");
   const siren = document.getElementById("sirenSound");
 
-  if (data.emergency && !alertActive) {
-    alertActive = true;
+  if (data.emergency && !emergencyActive) {
+    emergencyActive = true;
     alertBox.style.display = "block";
-    siren.play().catch(() => {});
-    if (navigator.vibrate) {
-      navigator.vibrate([500, 300, 500, 300, 500]);
-    }
+    siren.play().catch(()=>{});
+    if (navigator.vibrate) navigator.vibrate([500,300,500]);
   }
 
-  if (!data.emergency && alertActive) {
-    alertActive = false;
+  if (!data.emergency && emergencyActive) {
+    emergencyActive = false;
     alertBox.style.display = "none";
     siren.pause();
     siren.currentTime = 0;
   }
 }
 
-/* Intervals */
 setInterval(updateMap, 4000);
 setInterval(checkEmergency, 2000);
 </script>
