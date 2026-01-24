@@ -45,13 +45,13 @@
 <div class="box">
   <h2>🚑 Ambulance Device</h2>
 
-  <!-- Nearest hospitals in Nellore -->
+  <!-- Hospitals list -->
   <select id="hospitalList">
-    <option value="">🏥 Select nearest hospital (Nellore)</option>
+    <option value="">🏥 Select hospital (Nellore)</option>
   </select>
 
   <div class="hint">
-    Hospitals are auto-listed for Nellore to save time in emergencies
+    Destination will be set ONLY after manual selection
   </div>
 
   <input id="location" placeholder="Live GPS location" readonly>
@@ -68,26 +68,26 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* 🔗 Supabase */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
 let watchId = null;
+let destinationChosen = false; // 🔒 key fix
 
 /* 🏥 Load hospitals in Nellore */
 async function loadNelloreHospitals() {
   const url =
     `https://nominatim.openstreetmap.org/search?` +
-    `format=json&q=hospital+in+Nellore+Andhra+Pradesh&limit=8`;
+    `format=json&q=hospital+in+Nellore+Andhra+Pradesh&limit=10`;
 
   const res = await fetch(url);
   const hospitals = await res.json();
 
   const list = document.getElementById("hospitalList");
   list.innerHTML =
-    `<option value="">🏥 Select nearest hospital (Nellore)</option>`;
+    `<option value="">🏥 Select hospital (Nellore)</option>`;
 
   hospitals.forEach(h => {
     const opt = document.createElement("option");
@@ -97,12 +97,16 @@ async function loadNelloreHospitals() {
   });
 }
 
-/* On hospital selection */
+/* ✅ Destination set ONLY on manual change */
 document.getElementById("hospitalList").addEventListener("change", async e => {
-  if (!e.target.value) return;
+  if (!e.target.value) return;          // ignore empty
+  if (destinationChosen) return;        // ignore re-trigger
+
+  destinationChosen = true;             // 🔒 lock
 
   const destLatLng = e.target.value;
-  const destName = e.target.options[e.target.selectedIndex].text;
+  const destName =
+    e.target.options[e.target.selectedIndex].text;
 
   await supabaseClient
     .from("alerts")
@@ -174,7 +178,7 @@ async function cancelEmergency() {
     "✅ Emergency alert cancelled";
 }
 
-/* Load hospitals on page load */
+/* Load hospitals once */
 loadNelloreHospitals();
 </script>
 
