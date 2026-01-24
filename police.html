@@ -13,7 +13,7 @@
       background: #f4f6f9;
     }
     .box {
-      max-width: 500px;
+      max-width: 520px;
       margin: 20px auto;
       background: white;
       padding: 15px;
@@ -21,8 +21,7 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.25);
     }
     #map {
-      height: 400px;
-      margin-top: 10px;
+      height: 420px;
       border-radius: 8px;
     }
     .info {
@@ -38,12 +37,45 @@
       border-radius:6px;
       font-weight:bold;
       text-align:center;
-      margin-bottom:10px;
+      margin-bottom:8px;
       animation: blink 1s infinite;
     }
     @keyframes blink {
       0%{opacity:1}
       50%{opacity:.6}
+      100%{opacity:1}
+    }
+
+    /* 🚑 Ambulance icon */
+    .amb-wrap {
+      width:42px;
+      height:42px;
+      position:relative;
+      transform-origin:center;
+    }
+    .amb-body {
+      width:42px;
+      height:42px;
+      background:url("ambulance.png") no-repeat center;
+      background-size:contain;
+      position:absolute;
+      z-index:2;
+    }
+    .siren {
+      width:8px;
+      height:8px;
+      border-radius:50%;
+      position:absolute;
+      top:-4px;
+      animation:flash 0.6s infinite;
+      z-index:1;
+    }
+    .red { left:8px; background:red; }
+    .blue { right:8px; background:blue; animation-delay:.3s; }
+
+    @keyframes flash {
+      0%{opacity:1}
+      50%{opacity:.2}
       100%{opacity:1}
     }
   </style>
@@ -57,8 +89,7 @@
     🚨 EMERGENCY AMBULANCE APPROACHING – CLEAR TRAFFIC 🚨
   </div>
 
-  <!-- ETA + DISTANCE -->
-  <div class="info" id="eta">
+  <div class="info" id="info">
     ETA: calculating… | Distance: calculating…
   </div>
 
@@ -79,96 +110,115 @@ const supabaseClient = supabase.createClient(
 );
 
 /* Map */
-const map = L.map("map").setView([17.385, 78.486], 14);
+const map = L.map("map").setView([17.385,78.486],14);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
   .addTo(map);
 
-let ambMarker = null;
-let routeLine = null;
-let emergencyActive = false;
+/* Ambulance icon */
+const ambIcon = L.divIcon({
+  className:"",
+  html:`
+    <div class="amb-wrap" id="ambWrap">
+      <div class="siren red"></div>
+      <div class="siren blue"></div>
+      <div class="amb-body"></div>
+    </div>
+  `,
+  iconSize:[42,42],
+  iconAnchor:[21,21]
+});
 
-/* Update map + ETA + DISTANCE */
-async function updateMap() {
-  const { data } = await supabaseClient
+let ambMarker=null;
+let routeLine=null;
+let lastPos=null;
+let emergencyActive=false;
+
+/* Bearing */
+function bearing(a,b){
+  const y=Math.sin((b[1]-a[1])*Math.PI/180)*Math.cos(b[0]*Math.PI/180);
+  const x=Math.cos(a[0]*Math.PI/180)*Math.sin(b[0]*Math.PI/180)-
+          Math.sin(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*
+          Math.cos((b[1]-a[1])*Math.PI/180);
+  return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+
+/* Update map */
+async function updateMap(){
+  const {data}=await supabaseClient
     .from("alerts")
-    .select("location, destination")
-    .eq("id", 1)
+    .select("location,destination")
+    .eq("id",1)
     .single();
 
-  if (!data || !data.location || !data.destination) return;
+  if(!data||!data.location||!data.destination)return;
 
-  const [alat, alng] = data.location.split(",").map(Number);
-  const [dlat, dlng] = data.destination.split(",").map(Number);
+  const cur=data.location.split(",").map(Number);
+  const dest=data.destination.split(",").map(Number);
 
-  /* Ambulance marker */
-  if (!ambMarker) {
-    ambMarker = L.marker([alat, alng]).addTo(map);
-    map.setView([alat, alng], 15);
-  } else {
-    ambMarker.setLatLng([alat, alng]);
+  if(!ambMarker){
+    ambMarker=L.marker(cur,{icon:ambIcon}).addTo(map);
+    lastPos=cur;
+    map.setView(cur,15);
+  }else{
+    const ang=bearing(lastPos,cur);
+    const el=document.getElementById("ambWrap");
+    if(el)el.style.transform=`rotate(${ang}deg)`;
+    ambMarker.setLatLng(cur);
+    lastPos=cur;
   }
 
-  /* Route */
-  const url =
-    `https://router.project-osrm.org/route/v1/driving/` +
-    `${alng},${alat};${dlng},${dlat}?overview=full&geometries=geojson`;
+  const url=`https://router.project-osrm.org/route/v1/driving/${cur[1]},${cur[0]};${dest[1]},${dest[0]}?overview=full&geometries=geojson`;
+  const r=await fetch(url); 
+  const j=await r.json();
+  if(!j.routes)return;
 
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.routes || !json.routes.length) return;
+  const route=j.routes[0];
+  const coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
 
-  const route = json.routes[0];
-  const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-
-  if (!routeLine) {
-    routeLine = L.polyline(coords, {
-      color: "red",
-      weight: 5
-    }).addTo(map);
+  if(!routeLine){
+    routeLine=L.polyline(coords,{color:"red",weight:5}).addTo(map);
     map.fitBounds(routeLine.getBounds());
-  } else {
+  }else{
     routeLine.setLatLngs(coords);
   }
 
-  /* ETA + DISTANCE */
-  const etaMin = Math.ceil(route.duration / 60);
-  const distKm = (route.distance / 1000).toFixed(2);
+  const eta=Math.ceil(route.duration/60);
+  const dist=(route.distance/1000).toFixed(2);
 
-  document.getElementById("eta").innerText =
-    `ETA: ${etaMin} min | Distance: ${distKm} km`;
+  document.getElementById("info").innerText=
+    `ETA: ${eta} min | Distance: ${dist} km`;
 }
 
 /* Emergency alert */
-async function checkEmergency() {
-  const { data } = await supabaseClient
+async function checkEmergency(){
+  const {data}=await supabaseClient
     .from("alerts")
     .select("emergency")
-    .eq("id", 1)
+    .eq("id",1)
     .single();
 
-  if (!data) return;
+  if(!data)return;
 
-  const box = document.getElementById("alertBox");
-  const siren = document.getElementById("sirenSound");
+  const box=document.getElementById("alertBox");
+  const siren=document.getElementById("sirenSound");
 
-  if (data.emergency && !emergencyActive) {
-    emergencyActive = true;
-    box.style.display = "block";
+  if(data.emergency&&!emergencyActive){
+    emergencyActive=true;
+    box.style.display="block";
     siren.play().catch(()=>{});
-    if (navigator.vibrate) navigator.vibrate([500,300,500]);
+    if(navigator.vibrate)navigator.vibrate([500,300,500]);
   }
-
-  if (!data.emergency && emergencyActive) {
-    emergencyActive = false;
-    box.style.display = "none";
+  if(!data.emergency&&emergencyActive){
+    emergencyActive=false;
+    box.style.display="none";
     siren.pause();
-    siren.currentTime = 0;
+    siren.currentTime=0;
   }
 }
 
 /* Intervals */
-setInterval(updateMap, 4000);
-setInterval(checkEmergency, 2000);
+setInterval(updateMap,4000);
+setInterval(checkEmergency,2000);
 </script>
 
 </body>
