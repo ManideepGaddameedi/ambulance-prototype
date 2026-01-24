@@ -18,17 +18,11 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
       text-align: center;
     }
-    button {
+    input, button {
       width: 100%;
-      padding: 12px;
+      padding: 10px;
       margin-top: 10px;
       font-size: 16px;
-      cursor: pointer;
-    }
-    input {
-      width: 100%;
-      padding: 8px;
-      margin-top: 10px;
     }
     .emergency {
       background: red;
@@ -46,12 +40,18 @@
 <div class="box">
   <h2>🚑 Ambulance Device</h2>
 
-  <input type="text" id="location" placeholder="Tracking location..." readonly>
+  <!-- Destination input (PRESERVED) -->
+  <input
+    id="destinationName"
+    placeholder="Destination (e.g. Gandhi Hospital Hyderabad)"
+  >
+
+  <input id="location" placeholder="Live GPS location" readonly>
 
   <button onclick="startTracking()">▶ START TRACKING</button>
   <button onclick="stopTracking()">⛔ STOP TRACKING</button>
 
-  <!-- 🚨 Emergency buttons (ADDED) -->
+  <!-- 🚨 Emergency (ADDED ONLY) -->
   <button class="emergency" onclick="sendEmergency()">🚨 EMERGENCY ALERT</button>
   <button class="cancel" onclick="cancelEmergency()">❌ CANCEL ALERT</button>
 
@@ -67,47 +67,68 @@ const supabaseClient = supabase.createClient(
 );
 
 let watchId = null;
+let destinationLatLng = null;
 
-/* ▶ Start GPS tracking */
-function startTracking() {
-  if (!navigator.geolocation) {
-    alert("Geolocation not supported");
+/* Convert destination name → lat,lng */
+async function geocode(place) {
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}`
+  );
+  const data = await res.json();
+  if (!data.length) return null;
+  return `${data[0].lat},${data[0].lon}`;
+}
+
+/* Start tracking */
+async function startTracking() {
+  const destName = document.getElementById("destinationName").value.trim();
+  if (!destName) {
+    alert("Enter destination name");
     return;
   }
 
-  watchId = navigator.geolocation.watchPosition(
-    async (position) => {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      const locText = lat + "," + lng;
+  destinationLatLng = await geocode(destName);
+  if (!destinationLatLng) {
+    alert("Destination not found");
+    return;
+  }
 
-      document.getElementById("location").value = locText;
+  await supabaseClient
+    .from("alerts")
+    .update({
+      destination: destinationLatLng,
+      destination_name: destName
+    })
+    .eq("id", 1);
+
+  watchId = navigator.geolocation.watchPosition(
+    async pos => {
+      const loc = `${pos.coords.latitude},${pos.coords.longitude}`;
+      document.getElementById("location").value = loc;
 
       await supabaseClient
         .from("alerts")
-        .update({
-          location: locText
-        })
+        .update({ location: loc })
         .eq("id", 1);
 
       document.getElementById("msg").innerText =
         "📍 Tracking live location...";
     },
-    () => alert("Location permission denied"),
+    () => alert("GPS permission denied"),
     { enableHighAccuracy: true }
   );
 }
 
-/* ⛔ Stop tracking */
+/* Stop tracking */
 function stopTracking() {
-  if (watchId !== null) {
+  if (watchId) {
     navigator.geolocation.clearWatch(watchId);
     watchId = null;
     document.getElementById("msg").innerText = "⛔ Tracking stopped";
   }
 }
 
-/* 🚨 Emergency ON (ADDED) */
+/* 🚨 Emergency ON */
 async function sendEmergency() {
   await supabaseClient
     .from("alerts")
@@ -115,10 +136,10 @@ async function sendEmergency() {
     .eq("id", 1);
 
   document.getElementById("msg").innerText =
-    "🚨 Emergency alert sent to police";
+    "🚨 Emergency alert sent";
 }
 
-/* ❌ Emergency OFF (ADDED) */
+/* ❌ Emergency OFF */
 async function cancelEmergency() {
   await supabaseClient
     .from("alerts")
