@@ -4,14 +4,16 @@
   <title>Traffic Police Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <!-- Leaflet CSS -->
   <link rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <style>
     body {
       font-family: Arial, sans-serif;
       background: #f4f6f9;
     }
+
     .box {
       max-width: 480px;
       margin: 30px auto;
@@ -20,11 +22,13 @@
       border-radius: 10px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.25);
     }
+
     #map {
       height: 400px;
       margin-top: 10px;
       border-radius: 8px;
     }
+
     .eta {
       font-weight: bold;
       color: #d32f2f;
@@ -40,11 +44,101 @@
   <div id="map"></div>
 </div>
 
+<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* Supabase */
+/* 🔗 Supabase connection */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_q
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
+);
+
+/* 🗺 Map setup */
+const map = L.map("map").setView([17.385, 78.486], 14);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "© OpenStreetMap contributors"
+}).addTo(map);
+
+let ambulanceMarker = null;
+let destinationMarker = null;
+let routeLine = null;
+
+/* 🔄 Fetch data + draw route + ETA */
+async function update() {
+  const { data, error } = await supabaseClient
+    .from("alerts")
+    .select("location, destination, destination_name")
+    .eq("id", 1)
+    .single();
+
+  if (error) {
+    console.error("DB error:", error);
+    return;
+  }
+
+  if (!data.location || !data.destination) {
+    console.warn("Waiting for location or destination…");
+    return;
+  }
+
+  const [alat, alng] = data.location.split(",").map(Number);
+  const [dlat, dlng] = data.destination.split(",").map(Number);
+
+  /* 🚑 Ambulance marker */
+  if (!ambulanceMarker) {
+    ambulanceMarker = L.marker([alat, alng]).addTo(map);
+    map.setView([alat, alng], 15);
+  } else {
+    ambulanceMarker.setLatLng([alat, alng]);
+  }
+
+  /* 🏥 Destination marker */
+  if (!destinationMarker) {
+    destinationMarker = L.marker([dlat, dlng])
+      .addTo(map)
+      .bindPopup("🏥 " + (data.destination_name || "Destination"));
+  }
+
+  /* 🛣️ OSRM route */
+  const url =
+    `https://router.project-osrm.org/route/v1/driving/` +
+    `${alng},${alat};${dlng},${dlat}?overview=full&geometries=geojson`;
+
+  const res = await fetch(url);
+  const json = await res.json();
+
+  if (!json.routes || !json.routes.length) return;
+
+  const route = json.routes[0];
+  const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+
+  if (routeLine) {
+    routeLine.setLatLngs(coords);
+  } else {
+    routeLine = L.polyline(coords, {
+      color: "red",
+      weight: 5
+    }).addTo(map);
+
+    map.fitBounds(routeLine.getBounds());
+  }
+
+  /* ⏱ ETA calculation */
+  const etaMin = Math.ceil(route.duration / 60);
+  const distKm = (route.distance / 1000).toFixed(1);
+
+  document.getElementById("eta").innerText =
+    `ETA: ${etaMin} min (${distKm} km)`;
+}
+
+/* Refresh every 4 seconds */
+setInterval(update, 4000);
+</script>
+
+</body>
+</html>
