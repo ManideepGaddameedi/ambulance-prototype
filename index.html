@@ -50,7 +50,7 @@
   </select>
 
   <div class="hint">
-    Hospitals are automatically ordered by nearest distance
+    Hospitals are ordered by distance. You can change destination anytime.
   </div>
 
   <input id="location" placeholder="Live GPS location" readonly>
@@ -74,9 +74,8 @@ const supabaseClient = supabase.createClient(
 
 let watchId = null;
 let hospitals = [];
-let destinationLocked = false;
 
-/* 📐 Distance formula */
+/* 📐 Distance calculation */
 function distanceKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -89,13 +88,14 @@ function distanceKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-/* 🏥 Load all hospitals (once) */
+/* 🏥 Load hospitals once (Overpass API) */
 async function loadHospitals() {
   const query = `
     [out:json];
     node["amenity"="hospital"](14.399,79.941,14.470,80.021);
     out;
   `;
+
   const res = await fetch(
     "https://overpass-api.de/api/interpreter",
     { method: "POST", body: query }
@@ -111,9 +111,9 @@ async function loadHospitals() {
     }));
 }
 
-/* 🔁 Update dropdown by distance */
+/* 🔁 Sort hospitals by current location */
 function updateHospitalList(curLat, curLon) {
-  if (!hospitals.length || destinationLocked) return;
+  if (!hospitals.length) return;
 
   hospitals.forEach(h => {
     h.dist = distanceKm(curLat, curLon, h.lat, h.lon);
@@ -122,6 +122,8 @@ function updateHospitalList(curLat, curLon) {
   hospitals.sort((a, b) => a.dist - b.dist);
 
   const list = document.getElementById("hospitalList");
+  const currentSelection = list.value; // preserve selection if possible
+
   list.innerHTML =
     `<option value="">🏥 Select nearest hospital (auto-sorted)</option>`;
 
@@ -131,32 +133,39 @@ function updateHospitalList(curLat, curLon) {
     opt.text = `${h.name} (${h.dist.toFixed(1)} km)`;
     list.appendChild(opt);
   });
+
+  // Try to keep current selection visible
+  if (currentSelection) {
+    list.value = currentSelection;
+  }
 }
 
-/* ✅ Manual selection only */
+/* ✅ Update destination EVERY TIME user selects */
 document.getElementById("hospitalList").addEventListener("change", async e => {
-  if (!e.target.value || destinationLocked) return;
+  if (!e.target.value) return;
 
-  destinationLocked = true;
-
-  const dest = e.target.value;
-  const name = e.target.options[e.target.selectedIndex].text;
+  const destLatLng = e.target.value;
+  const destName =
+    e.target.options[e.target.selectedIndex].text;
 
   await supabaseClient
     .from("alerts")
     .update({
-      destination: dest,
-      destination_name: name
+      destination: destLatLng,
+      destination_name: destName
     })
     .eq("id", 1);
 
   document.getElementById("msg").innerText =
-    "🏥 Destination set: " + name;
+    "🏥 Destination set: " + destName;
 });
 
 /* ▶ Start GPS */
 function startTracking() {
-  if (!navigator.geolocation) return alert("GPS not supported");
+  if (!navigator.geolocation) {
+    alert("Geolocation not supported");
+    return;
+  }
 
   watchId = navigator.geolocation.watchPosition(
     async pos => {
@@ -176,7 +185,7 @@ function startTracking() {
       document.getElementById("msg").innerText =
         "📍 Tracking live location...";
     },
-    () => alert("GPS denied"),
+    () => alert("GPS permission denied"),
     { enableHighAccuracy: true }
   );
 }
@@ -186,7 +195,8 @@ function stopTracking() {
   if (watchId) {
     navigator.geolocation.clearWatch(watchId);
     watchId = null;
-    document.getElementById("msg").innerText = "⛔ Tracking stopped";
+    document.getElementById("msg").innerText =
+      "⛔ Tracking stopped";
   }
 }
 
@@ -196,7 +206,9 @@ async function sendEmergency() {
     .from("alerts")
     .update({ emergency: true })
     .eq("id", 1);
-  document.getElementById("msg").innerText = "🚨 Emergency alert sent";
+
+  document.getElementById("msg").innerText =
+    "🚨 Emergency alert sent";
 }
 
 async function cancelEmergency() {
@@ -204,7 +216,9 @@ async function cancelEmergency() {
     .from("alerts")
     .update({ emergency: false })
     .eq("id", 1);
-  document.getElementById("msg").innerText = "✅ Emergency alert cancelled";
+
+  document.getElementById("msg").innerText =
+    "✅ Emergency alert cancelled";
 }
 
 /* Init */
