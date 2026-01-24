@@ -6,7 +6,7 @@
 
   <style>
     body {
-      font-family: Arial;
+      font-family: Arial, sans-serif;
       background: #f4f6f9;
     }
     .box {
@@ -20,15 +20,20 @@
     }
     button {
       width: 100%;
-      padding: 14px;
+      padding: 12px;
       margin-top: 10px;
       font-size: 16px;
-      font-weight: bold;
       cursor: pointer;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 10px;
     }
     .emergency {
       background: red;
       color: white;
+      font-weight: bold;
     }
     .cancel {
       background: #444;
@@ -39,15 +44,16 @@
 <body>
 
 <div class="box">
-  <h2>🚑 Ambulance Control</h2>
+  <h2>🚑 Ambulance Device</h2>
 
-  <button class="emergency" onclick="sendEmergency()">
-    🚨 EMERGENCY ALERT
-  </button>
+  <input type="text" id="location" placeholder="Tracking location..." readonly>
 
-  <button class="cancel" onclick="cancelEmergency()">
-    ❌ CANCEL ALERT
-  </button>
+  <button onclick="startTracking()">▶ START TRACKING</button>
+  <button onclick="stopTracking()">⛔ STOP TRACKING</button>
+
+  <!-- 🚨 Emergency buttons (ADDED) -->
+  <button class="emergency" onclick="sendEmergency()">🚨 EMERGENCY ALERT</button>
+  <button class="cancel" onclick="cancelEmergency()">❌ CANCEL ALERT</button>
 
   <p id="msg"></p>
 </div>
@@ -60,7 +66,48 @@ const supabaseClient = supabase.createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-/* 🚨 Send alert */
+let watchId = null;
+
+/* ▶ Start GPS tracking */
+function startTracking() {
+  if (!navigator.geolocation) {
+    alert("Geolocation not supported");
+    return;
+  }
+
+  watchId = navigator.geolocation.watchPosition(
+    async (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      const locText = lat + "," + lng;
+
+      document.getElementById("location").value = locText;
+
+      await supabaseClient
+        .from("alerts")
+        .update({
+          location: locText
+        })
+        .eq("id", 1);
+
+      document.getElementById("msg").innerText =
+        "📍 Tracking live location...";
+    },
+    () => alert("Location permission denied"),
+    { enableHighAccuracy: true }
+  );
+}
+
+/* ⛔ Stop tracking */
+function stopTracking() {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    document.getElementById("msg").innerText = "⛔ Tracking stopped";
+  }
+}
+
+/* 🚨 Emergency ON (ADDED) */
 async function sendEmergency() {
   await supabaseClient
     .from("alerts")
@@ -68,10 +115,10 @@ async function sendEmergency() {
     .eq("id", 1);
 
   document.getElementById("msg").innerText =
-    "🚨 Emergency alert sent to traffic police";
+    "🚨 Emergency alert sent to police";
 }
 
-/* ❌ Cancel alert */
+/* ❌ Emergency OFF (ADDED) */
 async function cancelEmergency() {
   await supabaseClient
     .from("alerts")
@@ -79,7 +126,7 @@ async function cancelEmergency() {
     .eq("id", 1);
 
   document.getElementById("msg").innerText =
-    "✅ Emergency alert cleared";
+    "✅ Emergency alert cancelled";
 }
 </script>
 
