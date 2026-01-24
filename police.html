@@ -4,8 +4,9 @@
   <title>Traffic Police Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <!-- Leaflet CSS -->
   <link rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
     body {
@@ -14,8 +15,8 @@
     }
 
     .box {
-      max-width: 480px;
-      margin: 30px auto;
+      max-width: 500px;
+      margin: 20px auto;
       background: white;
       padding: 15px;
       border-radius: 10px;
@@ -34,7 +35,26 @@
       margin-bottom: 6px;
     }
 
-    /* 🚑 Ambulance container */
+    /* 🚨 Emergency alert banner */
+    #alertBox {
+      display: none;
+      background: red;
+      color: white;
+      padding: 12px;
+      border-radius: 6px;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 10px;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0% { opacity: 1; }
+      50% { opacity: 0.6; }
+      100% { opacity: 1; }
+    }
+
+    /* 🚑 Ambulance wrapper */
     .ambulance-wrapper {
       width: 42px;
       height: 42px;
@@ -50,8 +70,6 @@
       background: url("ambulance.png") no-repeat center;
       background-size: contain;
       position: absolute;
-      top: 0;
-      left: 0;
       z-index: 2;
     }
 
@@ -78,8 +96,8 @@
     }
 
     @keyframes flash {
-      0%   { opacity: 1; }
-      50%  { opacity: 0.2; }
+      0% { opacity: 1; }
+      50% { opacity: 0.2; }
       100% { opacity: 1; }
     }
   </style>
@@ -88,11 +106,25 @@
 
 <div class="box">
   <h2>🚦 Traffic Police Control</h2>
+
+  <!-- 🚨 Emergency Alert -->
+  <div id="alertBox">
+    🚨 EMERGENCY AMBULANCE APPROACHING – CLEAR TRAFFIC 🚨
+  </div>
+
   <div class="eta" id="eta">ETA: calculating…</div>
   <div id="map"></div>
 </div>
 
+<!-- Alarm sound -->
+<audio id="sirenSound" loop>
+  <source src="https://actions.google.com/sounds/v1/alarms/emergency_alarm.ogg">
+</audio>
+
+<!-- Leaflet -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
@@ -104,9 +136,10 @@ const supabaseClient = supabase.createClient(
 
 /* 🗺 Map */
 const map = L.map("map").setView([17.385, 78.486], 14);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
+  .addTo(map);
 
-/* 🚑 Custom icon with siren */
+/* 🚑 Ambulance icon */
 const ambulanceIcon = L.divIcon({
   className: "",
   html: `
@@ -125,22 +158,21 @@ let destMarker = null;
 let routeLine = null;
 let lastPos = null;
 let animTimer = null;
+let alertActive = false;
 
-/* 🧭 Bearing calculation */
+/* 🧭 Bearing */
 function getBearing(from, to) {
   const lat1 = from[0] * Math.PI / 180;
   const lat2 = to[0] * Math.PI / 180;
   const dLon = (to[1] - from[1]) * Math.PI / 180;
-
   const y = Math.sin(dLon) * Math.cos(lat2);
   const x =
     Math.cos(lat1) * Math.sin(lat2) -
     Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
-/* 🚑 Smooth move + rotation */
+/* 🚑 Smooth movement */
 function moveSmooth(from, to) {
   if (animTimer) clearInterval(animTimer);
 
@@ -163,15 +195,15 @@ function moveSmooth(from, to) {
   }, 100);
 }
 
-/* 🔄 Update data + ETA */
-async function update() {
-  const { data, error } = await supabaseClient
+/* 🔄 Update map + ETA */
+async function updateMap() {
+  const { data } = await supabaseClient
     .from("alerts")
     .select("location, destination, destination_name")
     .eq("id", 1)
     .single();
 
-  if (error || !data.location || !data.destination) return;
+  if (!data || !data.location || !data.destination) return;
 
   const [alat, alng] = data.location.split(",").map(Number);
   const [dlat, dlng] = data.destination.split(",").map(Number);
@@ -215,13 +247,43 @@ async function update() {
 
   const etaMin = Math.ceil(route.duration / 60);
   const distKm = (route.distance / 1000).toFixed(1);
-
   document.getElementById("eta").innerText =
     `ETA: ${etaMin} min (${distKm} km)`;
 }
 
-/* Update every 4 seconds */
-setInterval(update, 4000);
+/* 🚨 Emergency alert */
+async function checkEmergency() {
+  const { data } = await supabaseClient
+    .from("alerts")
+    .select("emergency")
+    .eq("id", 1)
+    .single();
+
+  if (!data) return;
+
+  const alertBox = document.getElementById("alertBox");
+  const siren = document.getElementById("sirenSound");
+
+  if (data.emergency && !alertActive) {
+    alertActive = true;
+    alertBox.style.display = "block";
+    siren.play().catch(() => {});
+    if (navigator.vibrate) {
+      navigator.vibrate([500, 300, 500, 300, 500]);
+    }
+  }
+
+  if (!data.emergency && alertActive) {
+    alertActive = false;
+    alertBox.style.display = "none";
+    siren.pause();
+    siren.currentTime = 0;
+  }
+}
+
+/* Intervals */
+setInterval(updateMap, 4000);
+setInterval(checkEmergency, 2000);
 </script>
 
 </body>
