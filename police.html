@@ -7,15 +7,13 @@
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
     body{font-family:Arial;background:#f4f6f9}
-    .box{max-width:520px;margin:20px auto;background:white;
+    .box{max-width:520px;margin:20px auto;background:#fff;
       padding:15px;border-radius:10px}
     #map{height:420px;border-radius:8px}
     .info{font-weight:bold;color:#d32f2f;margin-bottom:6px}
     #alertBox{display:none;background:red;color:white;
       padding:12px;text-align:center;font-weight:bold}
-    .amb-wrap{width:42px;height:42px;transform-origin:center}
-    .amb-body{
-      width:42px;height:42px;
+    .amb{width:42px;height:42px;
       background:url("ambulance.png") no-repeat center/contain}
   </style>
 </head>
@@ -31,9 +29,9 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const supabaseClient=supabase.createClient(
+const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "YOUR_ANON_KEY"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
 const map=L.map("map").setView([17.385,78.486],14);
@@ -41,16 +39,17 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
 .addTo(map);
 
 const icon=L.divIcon({
-  html:`<div class="amb-wrap"><div class="amb-body"></div></div>`,
+  html:`<div class="amb"></div>`,
   iconSize:[42,42],iconAnchor:[21,21]
 });
 
-let marker=null,routeLine=null;
+let marker=null;
 
 async function update(){
   const {data}=await supabaseClient.from("alerts")
-    .select("location,destination").eq("id",1).single();
-  if(!data) return;
+    .select("location,destination,emergency")
+    .eq("id",1).single();
+  if(!data||!data.location||!data.destination) return;
 
   const cur=data.location.split(",").map(Number);
   const dest=data.destination.split(",").map(Number);
@@ -67,10 +66,10 @@ async function update(){
 
   const eta=Math.ceil(j.routes[0].duration/60);
   const dist=(j.routes[0].distance/1000).toFixed(2);
-
   info.innerText=`ETA: ${eta} min | Distance: ${dist} km`;
-}
 
+  alertBox.style.display=data.emergency?"block":"none";
+}
 setInterval(update,4000);
 </script>
 </body>
