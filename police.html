@@ -34,14 +34,53 @@
       margin-bottom: 6px;
     }
 
-    /* 🚑 Rotating ambulance icon */
-    .ambulance-icon {
+    /* 🚑 Ambulance container */
+    .ambulance-wrapper {
+      width: 42px;
+      height: 42px;
+      position: relative;
+      transform-origin: center center;
+      transition: transform 0.2s linear;
+    }
+
+    /* 🚑 Ambulance image */
+    .ambulance-body {
       width: 42px;
       height: 42px;
       background: url("ambulance.png") no-repeat center;
       background-size: contain;
-      transform-origin: center center;
-      transition: transform 0.2s linear;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 2;
+    }
+
+    /* 🚨 Siren lights */
+    .siren {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      position: absolute;
+      top: -4px;
+      animation: flash 0.6s infinite;
+      z-index: 1;
+    }
+
+    .siren.red {
+      left: 8px;
+      background: red;
+    }
+
+    .siren.blue {
+      right: 8px;
+      background: blue;
+      animation-delay: 0.3s;
+    }
+
+    @keyframes flash {
+      0%   { opacity: 1; }
+      50%  { opacity: 0.2; }
+      100% { opacity: 1; }
     }
   </style>
 </head>
@@ -65,13 +104,18 @@ const supabaseClient = supabase.createClient(
 
 /* 🗺 Map */
 const map = L.map("map").setView([17.385, 78.486], 14);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
-  .addTo(map);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-/* 🚑 Custom rotating icon */
+/* 🚑 Custom icon with siren */
 const ambulanceIcon = L.divIcon({
   className: "",
-  html: `<div class="ambulance-icon" id="ambIcon"></div>`,
+  html: `
+    <div class="ambulance-wrapper" id="ambWrap">
+      <div class="siren red"></div>
+      <div class="siren blue"></div>
+      <div class="ambulance-body"></div>
+    </div>
+  `,
   iconSize: [42, 42],
   iconAnchor: [21, 21]
 });
@@ -79,9 +123,8 @@ const ambulanceIcon = L.divIcon({
 let ambMarker = null;
 let destMarker = null;
 let routeLine = null;
-
 let lastPos = null;
-let animationTimer = null;
+let animTimer = null;
 
 /* 🧭 Bearing calculation */
 function getBearing(from, to) {
@@ -97,27 +140,26 @@ function getBearing(from, to) {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
-/* 🚑 Smooth movement + rotation */
+/* 🚑 Smooth move + rotation */
 function moveSmooth(from, to) {
-  if (animationTimer) clearInterval(animationTimer);
+  if (animTimer) clearInterval(animTimer);
 
   const angle = getBearing(from, to);
-  const iconEl = document.getElementById("ambIcon");
-  if (iconEl) iconEl.style.transform = `rotate(${angle}deg)`;
+  const wrap = document.getElementById("ambWrap");
+  if (wrap) wrap.style.transform = `rotate(${angle}deg)`;
 
   let step = 0;
   const steps = 20;
   const latStep = (to[0] - from[0]) / steps;
   const lngStep = (to[1] - from[1]) / steps;
 
-  animationTimer = setInterval(() => {
+  animTimer = setInterval(() => {
     step++;
     ambMarker.setLatLng([
       from[0] + latStep * step,
       from[1] + lngStep * step
     ]);
-
-    if (step >= steps) clearInterval(animationTimer);
+    if (step >= steps) clearInterval(animTimer);
   }, 100);
 }
 
@@ -135,7 +177,6 @@ async function update() {
   const [dlat, dlng] = data.destination.split(",").map(Number);
   const current = [alat, alng];
 
-  /* Ambulance marker */
   if (!ambMarker) {
     ambMarker = L.marker(current, { icon: ambulanceIcon }).addTo(map);
     lastPos = current;
@@ -145,21 +186,19 @@ async function update() {
     lastPos = current;
   }
 
-  /* Destination marker */
   if (!destMarker) {
     destMarker = L.marker([dlat, dlng])
       .addTo(map)
       .bindPopup("🏥 " + (data.destination_name || "Destination"));
   }
 
-  /* OSRM route (UNCHANGED) */
   const url =
     `https://router.project-osrm.org/route/v1/driving/` +
     `${alng},${alat};${dlng},${dlat}?overview=full&geometries=geojson`;
 
   const res = await fetch(url);
   const json = await res.json();
-  if (!json.routes || !json.routes.length) return;
+  if (!json.routes) return;
 
   const route = json.routes[0];
   const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
@@ -171,11 +210,9 @@ async function update() {
       color: "red",
       weight: 5
     }).addTo(map);
-
     map.fitBounds(routeLine.getBounds());
   }
 
-  /* ETA (UNCHANGED) */
   const etaMin = Math.ceil(route.duration / 60);
   const distKm = (route.distance / 1000).toFixed(1);
 
@@ -183,7 +220,7 @@ async function update() {
     `ETA: ${etaMin} min (${distKm} km)`;
 }
 
-/* Refresh every 4 seconds */
+/* Update every 4 seconds */
 setInterval(update, 4000);
 </script>
 
