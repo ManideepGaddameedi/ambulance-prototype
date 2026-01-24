@@ -18,20 +18,11 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
       text-align: center;
     }
-    input, select, button {
+    select, input, button {
       width: 100%;
       padding: 10px;
       margin-top: 10px;
       font-size: 16px;
-    }
-    .emergency {
-      background: red;
-      color: white;
-      font-weight: bold;
-    }
-    .cancel {
-      background: #444;
-      color: white;
     }
     .hint {
       font-size: 13px;
@@ -46,11 +37,11 @@
   <h2>🚑 Ambulance Device</h2>
 
   <select id="hospitalList">
-    <option value="">🏥 Select nearest hospital</option>
+    <option value="">🏥 Nearest hospitals (with distance)</option>
   </select>
 
   <div class="hint">
-    List auto-sorts until you select. After that, you can freely reselect.
+    Hospitals are sorted automatically by nearest distance
   </div>
 
   <input id="location" placeholder="Live GPS location" readonly>
@@ -58,15 +49,13 @@
   <button onclick="startTracking()">▶ START TRACKING</button>
   <button onclick="stopTracking()">⛔ STOP TRACKING</button>
 
-  <button class="emergency" onclick="sendEmergency()">🚨 EMERGENCY ALERT</button>
-  <button class="cancel" onclick="cancelEmergency()">❌ CANCEL ALERT</button>
-
   <p id="msg"></p>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
+/* Supabase */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
@@ -74,9 +63,8 @@ const supabaseClient = supabase.createClient(
 
 let watchId = null;
 let hospitals = [];
-let userInteracted = false;   // 🔑 KEY FIX
 
-/* Distance */
+/* 📐 Haversine distance (km) */
 function distanceKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -89,17 +77,19 @@ function distanceKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-/* Load hospitals ONCE */
+/* 🏥 Load hospitals once (Nellore – Overpass API) */
 async function loadHospitals() {
   const query = `
     [out:json];
     node["amenity"="hospital"](14.399,79.941,14.470,80.021);
     out;
   `;
+
   const res = await fetch(
     "https://overpass-api.de/api/interpreter",
     { method: "POST", body: query }
   );
+
   const data = await res.json();
 
   hospitals = data.elements
@@ -110,10 +100,11 @@ async function loadHospitals() {
       lon: h.lon
     }));
 }
+loadHospitals();
 
-/* Populate dropdown (ONLY before interaction) */
-function populateHospitalList(curLat, curLon) {
-  if (userInteracted || !hospitals.length) return;
+/* 🔄 Update dropdown with distance */
+function updateHospitalList(curLat, curLon) {
+  if (!hospitals.length) return;
 
   hospitals.forEach(h => {
     h.dist = distanceKm(curLat, curLon, h.lat, h.lon);
@@ -123,40 +114,23 @@ function populateHospitalList(curLat, curLon) {
 
   const list = document.getElementById("hospitalList");
   list.innerHTML =
-    `<option value="">🏥 Select nearest hospital</option>`;
+    `<option value="">🏥 Nearest hospitals (with distance)</option>`;
 
   hospitals.slice(0, 10).forEach(h => {
     const opt = document.createElement("option");
     opt.value = `${h.lat},${h.lon}`;
-    opt.text = `${h.name} (${h.dist.toFixed(1)} km)`;
+    opt.text = `${h.name} (${h.dist.toFixed(2)} km)`;
     list.appendChild(opt);
   });
 }
 
-/* 🚑 Destination update — ALWAYS */
-document.getElementById("hospitalList").addEventListener("change", async e => {
-  if (!e.target.value) return;
-
-  userInteracted = true;   // 🔒 stop auto-refresh forever
-
-  const dest = e.target.value;
-  const name =
-    e.target.options[e.target.selectedIndex].text;
-
-  await supabaseClient
-    .from("alerts")
-    .update({
-      destination: dest,
-      destination_name: name
-    })
-    .eq("id", 1);
-
-  document.getElementById("msg").innerText =
-    "🏥 Destination set: " + name;
-});
-
-/* Start GPS */
+/* 📍 GPS tracking */
 function startTracking() {
+  if (!navigator.geolocation) {
+    alert("Geolocation not supported");
+    return;
+  }
+
   watchId = navigator.geolocation.watchPosition(
     async pos => {
       const lat = pos.coords.latitude;
@@ -170,17 +144,17 @@ function startTracking() {
         .update({ location: loc })
         .eq("id", 1);
 
-      populateHospitalList(lat, lon);
+      updateHospitalList(lat, lon);
 
       document.getElementById("msg").innerText =
         "📍 Tracking live location...";
     },
-    () => alert("GPS denied"),
+    () => alert("Location permission denied"),
     { enableHighAccuracy: true }
   );
 }
 
-/* Stop GPS */
+/* ⛔ Stop tracking */
 function stopTracking() {
   if (watchId) {
     navigator.geolocation.clearWatch(watchId);
@@ -190,27 +164,22 @@ function stopTracking() {
   }
 }
 
-/* Emergency */
-async function sendEmergency() {
+/* Destination selection (manual) */
+hospitalList.onchange = async e => {
+  if (!e.target.value) return;
+
   await supabaseClient
     .from("alerts")
-    .update({ emergency: true })
+    .update({
+      destination: e.target.value,
+      destination_name:
+        e.target.options[e.target.selectedIndex].text
+    })
     .eq("id", 1);
-  document.getElementById("msg").innerText =
-    "🚨 Emergency alert sent";
-}
 
-async function cancelEmergency() {
-  await supabaseClient
-    .from("alerts")
-    .update({ emergency: false })
-    .eq("id", 1);
   document.getElementById("msg").innerText =
-    "✅ Emergency alert cancelled";
-}
-
-/* Init */
-loadHospitals();
+    "🏥 Destination updated";
+};
 </script>
 
 </body>
