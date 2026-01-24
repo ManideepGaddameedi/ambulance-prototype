@@ -4,8 +4,8 @@
   <title>Traffic Police Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
   <style>
     body {
@@ -13,7 +13,7 @@
       background: #f4f6f9;
     }
     .box {
-      max-width: 500px;
+      max-width: 480px;
       margin: 30px auto;
       background: white;
       padding: 15px;
@@ -21,19 +21,14 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.25);
     }
     #map {
-      height: 420px;
+      height: 400px;
       margin-top: 10px;
       border-radius: 8px;
     }
-
-    /* 🚑 Rotating ambulance icon */
-    .ambulance-icon {
-      width: 48px;
-      height: 48px;
-      background: url("ambulance.png") no-repeat center;
-      background-size: contain;
-      transform-origin: center center;
-      transition: transform 0.2s linear;
+    .eta {
+      font-weight: bold;
+      color: #d32f2f;
+      margin-bottom: 6px;
     }
   </style>
 </head>
@@ -41,7 +36,7 @@
 
 <div class="box">
   <h2>🚦 Traffic Police Control</h2>
-  <p>Live Ambulance Route Tracking</p>
+  <div class="eta" id="eta">ETA: calculating…</div>
   <div id="map"></div>
 </div>
 
@@ -49,124 +44,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* 🔗 Supabase */
+/* Supabase */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
-);
-
-/* 🗺 Map */
-const map = L.map("map").setView([17.385, 78.486], 14);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-
-/* 🚑 Custom rotating icon */
-const ambulanceIcon = L.divIcon({
-  className: "",
-  html: `<div class="ambulance-icon" id="ambIcon"></div>`,
-  iconSize: [48, 48],
-  iconAnchor: [24, 24]
-});
-
-let ambMarker = null;
-let destMarker = null;
-let routeLine = null;
-
-let lastPos = null;
-let animationTimer = null;
-
-/* 🧭 Bearing calculation */
-function getBearing(from, to) {
-  const lat1 = from[0] * Math.PI / 180;
-  const lat2 = to[0] * Math.PI / 180;
-  const dLon = (to[1] - from[1]) * Math.PI / 180;
-
-  const y = Math.sin(dLon) * Math.cos(lat2);
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-
-  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-}
-
-/* 🚑 Smooth move + rotate */
-function moveSmooth(from, to) {
-  if (animationTimer) clearInterval(animationTimer);
-
-  const angle = getBearing(from, to);
-  const iconEl = document.getElementById("ambIcon");
-  if (iconEl) iconEl.style.transform = `rotate(${angle}deg)`;
-
-  let step = 0;
-  const steps = 20;
-  const latStep = (to[0] - from[0]) / steps;
-  const lngStep = (to[1] - from[1]) / steps;
-
-  animationTimer = setInterval(() => {
-    step++;
-    ambMarker.setLatLng([
-      from[0] + latStep * step,
-      from[1] + lngStep * step
-    ]);
-    if (step >= steps) clearInterval(animationTimer);
-  }, 100);
-}
-
-/* 🔄 Main update */
-async function update() {
-  const { data } = await supabaseClient
-    .from("alerts")
-    .select("location, destination, destination_name")
-    .eq("id", 1)
-    .single();
-
-  if (!data || !data.location || !data.destination) return;
-
-  const [alat, alng] = data.location.split(",").map(Number);
-  const [dlat, dlng] = data.destination.split(",").map(Number);
-  const current = [alat, alng];
-
-  /* 🚑 Ambulance marker */
-  if (!ambMarker) {
-    ambMarker = L.marker(current, { icon: ambulanceIcon }).addTo(map);
-    lastPos = current;
-    map.setView(current, 15);
-  } else {
-    moveSmooth(lastPos, current);
-    lastPos = current;
-  }
-
-  /* 🏥 Destination marker */
-  if (!destMarker) {
-    destMarker = L.marker([dlat, dlng])
-      .addTo(map)
-      .bindPopup("🏥 " + (data.destination_name || "Destination"));
-  }
-
-  /* 🛣️ OSRM road route */
-  const url =
-    `https://router.project-osrm.org/route/v1/driving/` +
-    `${alng},${alat};${dlng},${dlat}?overview=full&geometries=geojson`;
-
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.routes || !json.routes.length) return;
-
-  const coords = json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-
-  if (routeLine) {
-    routeLine.setLatLngs(coords);
-  } else {
-    routeLine = L.polyline(coords, {
-      color: "red",
-      weight: 5
-    }).addTo(map);
-    map.fitBounds(routeLine.getBounds());
-  }
-}
-
-/* Refresh every 3 seconds */
-setInterval(update, 3000);
-</script>
-
-</body>
-</html>
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_q
