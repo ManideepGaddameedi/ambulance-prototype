@@ -18,24 +18,36 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
       text-align: center;
     }
-    input, button {
+    button {
       width: 100%;
-      padding: 10px;
+      padding: 14px;
       margin-top: 10px;
       font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .emergency {
+      background: red;
+      color: white;
+    }
+    .cancel {
+      background: #444;
+      color: white;
     }
   </style>
 </head>
 <body>
 
 <div class="box">
-  <h2>🚑 Ambulance Device</h2>
+  <h2>🚑 Ambulance Control</h2>
 
-  <input id="destName" placeholder="Destination name (e.g. Gandhi Hospital)" />
-  <input id="location" placeholder="Live location..." readonly />
+  <button class="emergency" onclick="sendEmergency()">
+    🚨 EMERGENCY ALERT
+  </button>
 
-  <button onclick="startTracking()">▶ START TRACKING</button>
-  <button onclick="stopTracking()">⛔ STOP TRACKING</button>
+  <button class="cancel" onclick="cancelEmergency()">
+    ❌ CANCEL ALERT
+  </button>
 
   <p id="msg"></p>
 </div>
@@ -48,54 +60,26 @@ const supabaseClient = supabase.createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-let watchId = null;
-let destinationLatLng = null;
-
-/* Convert destination name → lat,lng */
-async function getCoordinates(place) {
-  const res = await fetch(
-    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}`,
-    { headers: { "User-Agent": "SmartAmbulanceSystem/1.0" } }
-  );
-  const data = await res.json();
-  if (!data.length) return null;
-  return `${data[0].lat},${data[0].lon}`;
-}
-
-async function startTracking() {
-  const place = document.getElementById("destName").value.trim();
-  if (!place) {
-    alert("Enter destination name");
-    return;
-  }
-
-  destinationLatLng = await getCoordinates(place);
-  if (!destinationLatLng) {
-    alert("Destination not found");
-    return;
-  }
+/* 🚨 Send alert */
+async function sendEmergency() {
+  await supabaseClient
+    .from("alerts")
+    .update({ emergency: true })
+    .eq("id", 1);
 
   document.getElementById("msg").innerText =
-    "📍 Destination set: " + place;
-
-  watchId = navigator.geolocation.watchPosition(async pos => {
-    const loc = `${pos.coords.latitude},${pos.coords.longitude}`;
-    document.getElementById("location").value = loc;
-
-    await supabaseClient
-      .from("alerts")
-      .upsert({
-        id: 1,
-        location: loc,
-        destination: destinationLatLng,
-        destination_name: place
-      });
-  });
+    "🚨 Emergency alert sent to traffic police";
 }
 
-function stopTracking() {
-  navigator.geolocation.clearWatch(watchId);
-  document.getElementById("msg").innerText = "⛔ Tracking stopped";
+/* ❌ Cancel alert */
+async function cancelEmergency() {
+  await supabaseClient
+    .from("alerts")
+    .update({ emergency: false })
+    .eq("id", 1);
+
+  document.getElementById("msg").innerText =
+    "✅ Emergency alert cleared";
 }
 </script>
 
