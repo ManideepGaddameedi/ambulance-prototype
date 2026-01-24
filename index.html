@@ -51,7 +51,7 @@
   </select>
 
   <div class="hint">
-    Destination will be set ONLY after manual selection
+    Each hospital has its own exact GPS location
   </div>
 
   <input id="location" placeholder="Live GPS location" readonly>
@@ -68,41 +68,55 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
+/* 🔗 Supabase */
 const supabaseClient = supabase.createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
 let watchId = null;
-let destinationChosen = false; // 🔒 key fix
+let destinationChosen = false;
 
-/* 🏥 Load hospitals in Nellore */
+/* 🏥 Load hospitals using Overpass API (CORRECT WAY) */
 async function loadNelloreHospitals() {
-  const url =
-    `https://nominatim.openstreetmap.org/search?` +
-    `format=json&q=hospital+in+Nellore+Andhra+Pradesh&limit=10`;
+  const query = `
+    [out:json];
+    node
+      ["amenity"="hospital"]
+      (14.399,79.941,14.470,80.021);  // Nellore bounding box
+    out;
+  `;
 
-  const res = await fetch(url);
-  const hospitals = await res.json();
+  const res = await fetch(
+    "https://overpass-api.de/api/interpreter",
+    {
+      method: "POST",
+      body: query
+    }
+  );
 
+  const data = await res.json();
   const list = document.getElementById("hospitalList");
+
   list.innerHTML =
     `<option value="">🏥 Select hospital (Nellore)</option>`;
 
-  hospitals.forEach(h => {
+  data.elements.forEach(h => {
+    if (!h.tags || !h.tags.name) return;
+
     const opt = document.createElement("option");
-    opt.value = `${h.lat},${h.lon}`;
-    opt.text = h.display_name.split(",")[0];
+    opt.value = `${h.lat},${h.lon}`;   // ✅ unique location
+    opt.text = h.tags.name;
     list.appendChild(opt);
   });
 }
 
-/* ✅ Destination set ONLY on manual change */
+/* ✅ Destination set ONLY on manual selection */
 document.getElementById("hospitalList").addEventListener("change", async e => {
-  if (!e.target.value) return;          // ignore empty
-  if (destinationChosen) return;        // ignore re-trigger
+  if (!e.target.value) return;
+  if (destinationChosen) return;
 
-  destinationChosen = true;             // 🔒 lock
+  destinationChosen = true;
 
   const destLatLng = e.target.value;
   const destName =
