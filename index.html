@@ -1,39 +1,49 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Hospital Debug</title>
+  <title>Hospital Debug Final</title>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<h2>Hospital Data Test</h2>
-<div id="result">Loading...</div>
+<h2>Supabase Connection Test</h2>
+<div id="result">Checking...</div>
 
 <script>
-const { createClient } = supabase;
+window.onload = async function() {
 
-const client = createClient(
-  "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
-);
-
-async function test() {
-  const { data, error } = await client
-    .from("hospitals")
-    .select("*");
-
-  if (error) {
-    document.getElementById("result").innerText =
-      "ERROR: " + error.message;
-    console.error(error);
-  } else {
-    document.getElementById("result").innerText =
-      "Hospitals Found: " + data.length;
-    console.log(data);
+  if (!window.supabase) {
+    document.getElementById("result").innerText = "Supabase library not loaded!";
+    return;
   }
-}
 
-test();
+  const { createClient } = window.supabase;
+
+  const client = createClient(
+    "https://inlkqessbewmxmtfvzfe.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
+  );
+
+  try {
+    const { data, error } = await client
+      .from("hospitals")
+      .select("*");
+
+    if (error) {
+      document.getElementById("result").innerText =
+        "ERROR: " + error.message;
+      console.error(error);
+    } else {
+      document.getElementById("result").innerText =
+        "SUCCESS! Hospitals found: " + data.length;
+      console.log(data);
+    }
+  } catch (err) {
+    document.getElementById("result").innerText =
+      "FETCH FAILED: " + err.message;
+    console.error(err);
+  }
+};
 </script>
 
 </body>
