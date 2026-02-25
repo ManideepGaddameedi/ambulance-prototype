@@ -16,8 +16,8 @@ window.onload = async function () {
   const { createClient } = window.supabase;
 
   const supabase = createClient(
-    "https://wrqwhykgnktfaaqiefjek.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndycXdoeWtnbnRrZmFxaWVmamVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNzM3OTUsImV4cCI6MjA4NDY0OTc5NX0.t_GEclFobEHRhAhB2W6clKGxbEHKmjbslD0cLmalIMU"
+    "https://inlkqessbewmxmtfvzfe.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
   );
 
   try {
@@ -35,12 +35,6 @@ window.onload = async function () {
 
     document.getElementById("status").innerText =
       "Connected! Hospitals found: " + data.length;
-
-    if (data.length === 0) {
-      document.getElementById("hospitalList").innerText =
-        "No hospitals in database.";
-      return;
-    }
 
     const list = document.getElementById("hospitalList");
 
