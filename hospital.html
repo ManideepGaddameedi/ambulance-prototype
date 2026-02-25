@@ -1,61 +1,72 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Hospital Page</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body { font-family: Arial; background:#f4f6f9; }
-    .box {
-      max-width:420px; margin:40px auto; background:#fff;
-      padding:20px; border-radius:10px;
-      box-shadow:0 4px 10px rgba(0,0,0,.2);
-    }
-    button { width:100%; padding:12px; margin-top:8px; font-size:16px; }
-  </style>
+  <title>Hospital Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 </head>
 <body>
 
-<div class="box">
-  <h2>🏥 Hospital Dashboard</h2>
+<h2>🏥 Hospital H1 Panel</h2>
 
-  <p><b>Status:</b> <span id="status">Waiting…</span></p>
-  <p><b>Location:</b> <span id="loc">--</span></p>
-  <p><b>ETA:</b> <span id="eta">--</span> min</p>
+<p id="ambulanceInfo">Waiting for ambulance...</p>
 
-  <hr>
+<label>Beds Available:</label>
+<input type="number" id="beds" value="5"><br><br>
 
-  <button onclick="updateBed('YES')">✅ Bed Available</button>
-  <button onclick="updateBed('NO')">❌ Bed Not Available</button>
+<label>Doctor Available:</label>
+<select id="doctor">
+  <option value="true">Yes</option>
+  <option value="false">No</option>
+</select><br><br>
 
-  <p id="msg"></p>
-</div>
+<button onclick="updateHospital()">Update</button>
 
 <script>
-const BACKEND = "https://ambulance-backend.onrender.com";
 
-async function fetchData() {
-  const res = await fetch(`${BACKEND}/get_status`);
-  const data = await res.json();
-  if (!data.latitude) return;
+const supabase = supabase.createClient(
+  "https://inlkqessbewmxmtfvzfe.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
+);
 
-  document.getElementById("status").innerText = "Ambulance Incoming";
-  document.getElementById("loc").innerText =
-    data.latitude.toFixed(5) + ", " + data.longitude.toFixed(5);
-  document.getElementById("eta").innerText = data.eta;
+let hospitalId = "H1";
+
+// Listen ambulance updates
+supabase
+  .channel("ambulance-updates")
+  .on(
+    "postgres_changes",
+    { event: "UPDATE", schema: "public", table: "ambulances" },
+    payload => {
+
+      if(payload.new.selected_hospital === hospitalId) {
+
+        document.getElementById("ambulanceInfo").innerText =
+          "Ambulance Incoming 🚑\n" +
+          "Location: " + payload.new.latitude +
+          ", " + payload.new.longitude +
+          "\nStatus: " + payload.new.status;
+
+      }
+
+    }
+  )
+  .subscribe();
+
+
+// Update hospital status
+function updateHospital() {
+
+  let beds = parseInt(document.getElementById("beds").value);
+  let doctor = document.getElementById("doctor").value === "true";
+
+  supabase.from("hospitals").update({
+    beds_available: beds,
+    doctor_available: doctor
+  }).eq("id", hospitalId);
+
+  alert("Hospital Updated!");
 }
 
-function updateBed(val) {
-  fetch(`${BACKEND}/update_bed`, {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ bed: val })
-  });
-
-  document.getElementById("msg").innerText =
-    "Bed status updated: " + val;
-}
-
-setInterval(fetchData, 3000);
 </script>
 
 </body>
