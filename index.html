@@ -2,7 +2,7 @@
 <html>
 <head>
   <title>Ambulance Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -15,15 +15,16 @@
 
 <script>
 
-const supabase = supabase.createClient(
+const { createClient } = supabase;
+
+const supabaseClient = createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
 let ambulanceId = "A1";
 
-// Auto update location every 5 seconds
-setInterval(() => {
+setInterval(async () => {
 
   let lat = 17.38 + Math.random()/100;
   let lng = 78.48 + Math.random()/100;
@@ -31,7 +32,7 @@ setInterval(() => {
   document.getElementById("location").innerText =
     "Location: " + lat.toFixed(5) + ", " + lng.toFixed(5);
 
-  supabase.from("ambulances").update({
+  await supabaseClient.from("ambulances").update({
     latitude: lat,
     longitude: lng,
     status: "Moving"
@@ -40,19 +41,16 @@ setInterval(() => {
 }, 5000);
 
 
-// Select hospital
-function selectHospital() {
+async function selectHospital() {
 
-  supabase.from("ambulances").update({
+  await supabaseClient.from("ambulances").update({
     selected_hospital: "H1",
     status: "On The Way"
   }).eq("id", ambulanceId);
 
 }
 
-
-// Listen hospital updates
-supabase
+supabaseClient
   .channel("hospital-updates")
   .on(
     "postgres_changes",
