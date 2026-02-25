@@ -1,92 +1,122 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Smart Ambulance</title>
+  <title>Smart Ambulance - Nearest Hospitals</title>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
 <h2>🚑 Smart Ambulance Panel</h2>
 
-<p id="liveLocation">Getting Location...</p>
+<p id="location">Getting Location...</p>
 
 <h3>Nearest Hospitals</h3>
-<div id="hospitalList"></div>
-
-<button onclick="emergency()" style="background:red;color:white;padding:10px;">
-🚨 EMERGENCY
-</button>
+<div id="hospitalList">Loading...</div>
 
 <script>
 const { createClient } = supabase;
 
 const client = createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "YOUR_ANON_KEY"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
 );
 
-let ambulanceId = "A1";
 let currentLat = 0;
 let currentLng = 0;
-let selectedHospital = null;
 
-/* 1️⃣ Get Real GPS Location */
-navigator.geolocation.watchPosition(async (position) => {
+/* 1️⃣ Get Live GPS Location */
+navigator.geolocation.getCurrentPosition(async (position) => {
 
   currentLat = position.coords.latitude;
   currentLng = position.coords.longitude;
 
-  document.getElementById("liveLocation").innerText =
-    "Live Location: " + currentLat + ", " + currentLng;
+  document.getElementById("location").innerText =
+    "Your Location: " + currentLat + ", " + currentLng;
 
-  /* Update location to database */
-  await client.from("ambulances").update({
-    latitude: currentLat,
-    longitude: currentLng,
-    status: "Active",
-    selected_hospital: selectedHospital
-  }).eq("id", ambulanceId);
+  loadHospitals();
 
-  loadNearestHospitals();
-
+}, error => {
+  document.getElementById("location").innerText =
+    "Location access denied!";
 });
 
-/* 2️⃣ Load Nearest Hospitals */
-async function loadNearestHospitals() {
 
-  const { data } = await client.from("hospitals").select("*");
+/* 2️⃣ Load Hospitals */
+async function loadHospitals() {
+
+  const { data, error } = await client
+    .from("hospitals")
+    .select("*");
+
+  if (error) {
+    document.getElementById("hospitalList").innerText =
+      "Error: " + error.message;
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    document.getElementById("hospitalList").innerText =
+      "No hospitals found in database.";
+    return;
+  }
+
+  /* 3️⃣ Calculate Distance */
+  data.forEach(h => {
+    h.distance = getDistance(
+      currentLat,
+      currentLng,
+      h.latitude,
+      h.longitude
+    );
+  });
+
+  /* 4️⃣ Sort Nearest First */
+  data.sort((a, b) => a.distance - b.distance);
+
+  displayHospitals(data);
+}
+
+
+/* 5️⃣ Display Buttons */
+function displayHospitals(hospitals) {
 
   let list = document.getElementById("hospitalList");
   list.innerHTML = "";
 
-  data.forEach(h => {
-
-    let distance = getDistance(
-      currentLat, currentLng,
-      h.latitude, h.longitude
-    );
+  hospitals.forEach(h => {
 
     let btn = document.createElement("button");
-    btn.innerText = h.name + " (" + distance.toFixed(2) + " km)";
-    btn.onclick = () => selectHospital(h.id);
+
+    btn.innerText =
+      h.name +
+      " - " + h.distance.toFixed(2) + " km" +
+      " | Beds: " + h.beds_available +
+      " | Doctor: " + (h.doctor_available ? "Yes" : "No");
+
+    btn.style.marginBottom = "8px";
+    btn.style.padding = "8px";
+
+    btn.onclick = () => {
+      alert("Selected: " + h.name);
+    };
 
     list.appendChild(btn);
     list.appendChild(document.createElement("br"));
-
   });
 }
 
-/* Distance Formula */
+
+/* Haversine Distance Formula */
 function getDistance(lat1, lon1, lat2, lon2) {
 
-  const R = 6371;
-  const dLat = (lat2-lat1) * Math.PI/180;
-  const dLon = (lon2-lon1) * Math.PI/180;
+  const R = 6371; // Earth radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
 
   const a =
     Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1*Math.PI/180) *
-    Math.cos(lat2*Math.PI/180) *
+    Math.cos(lat1 * Math.PI/180) *
+    Math.cos(lat2 * Math.PI/180) *
     Math.sin(dLon/2) * Math.sin(dLon/2);
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
@@ -94,29 +124,7 @@ function getDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-/* 3️⃣ Select Hospital */
-async function selectHospital(id) {
-
-  selectedHospital = id;
-
-  await client.from("ambulances").update({
-    selected_hospital: id,
-    status: "On The Way"
-  }).eq("id", ambulanceId);
-
-  alert("Hospital Selected!");
-}
-
-/* 4️⃣ Emergency Button */
-async function emergency() {
-
-  await client.from("ambulances").update({
-    status: "EMERGENCY"
-  }).eq("id", ambulanceId);
-
-  alert("Emergency Sent to Police & Hospital!");
-}
-
 </script>
+
 </body>
 </html>
