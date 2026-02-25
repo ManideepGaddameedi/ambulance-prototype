@@ -1,73 +1,122 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Ambulance Dashboard</title>
+  <title>Smart Ambulance</title>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<h2>🚑 Ambulance Panel</h2>
+<h2>🚑 Smart Ambulance Panel</h2>
 
-<p id="location">Location: --</p>
-<p id="hospitalStatus">Hospital Info: --</p>
+<p id="liveLocation">Getting Location...</p>
 
-<button onclick="selectHospital()">Select Hospital H1</button>
+<h3>Nearest Hospitals</h3>
+<div id="hospitalList"></div>
+
+<button onclick="emergency()" style="background:red;color:white;padding:10px;">
+🚨 EMERGENCY
+</button>
 
 <script>
-
 const { createClient } = supabase;
 
-const supabaseClient = createClient(
+const client = createClient(
   "https://inlkqessbewmxmtfvzfe.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
+  "YOUR_ANON_KEY"
 );
 
 let ambulanceId = "A1";
+let currentLat = 0;
+let currentLng = 0;
+let selectedHospital = null;
 
-setInterval(async () => {
+/* 1️⃣ Get Real GPS Location */
+navigator.geolocation.watchPosition(async (position) => {
 
-  let lat = 17.38 + Math.random()/100;
-  let lng = 78.48 + Math.random()/100;
+  currentLat = position.coords.latitude;
+  currentLng = position.coords.longitude;
 
-  document.getElementById("location").innerText =
-    "Location: " + lat.toFixed(5) + ", " + lng.toFixed(5);
+  document.getElementById("liveLocation").innerText =
+    "Live Location: " + currentLat + ", " + currentLng;
 
-  await supabaseClient.from("ambulances").update({
-    latitude: lat,
-    longitude: lng,
-    status: "Moving"
+  /* Update location to database */
+  await client.from("ambulances").update({
+    latitude: currentLat,
+    longitude: currentLng,
+    status: "Active",
+    selected_hospital: selectedHospital
   }).eq("id", ambulanceId);
 
-}, 5000);
+  loadNearestHospitals();
 
+});
 
-async function selectHospital() {
+/* 2️⃣ Load Nearest Hospitals */
+async function loadNearestHospitals() {
 
-  await supabaseClient.from("ambulances").update({
-    selected_hospital: "H1",
+  const { data } = await client.from("hospitals").select("*");
+
+  let list = document.getElementById("hospitalList");
+  list.innerHTML = "";
+
+  data.forEach(h => {
+
+    let distance = getDistance(
+      currentLat, currentLng,
+      h.latitude, h.longitude
+    );
+
+    let btn = document.createElement("button");
+    btn.innerText = h.name + " (" + distance.toFixed(2) + " km)";
+    btn.onclick = () => selectHospital(h.id);
+
+    list.appendChild(btn);
+    list.appendChild(document.createElement("br"));
+
+  });
+}
+
+/* Distance Formula */
+function getDistance(lat1, lon1, lat2, lon2) {
+
+  const R = 6371;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLon = (lon2-lon1) * Math.PI/180;
+
+  const a =
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1*Math.PI/180) *
+    Math.cos(lat2*Math.PI/180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+  return R * c;
+}
+
+/* 3️⃣ Select Hospital */
+async function selectHospital(id) {
+
+  selectedHospital = id;
+
+  await client.from("ambulances").update({
+    selected_hospital: id,
     status: "On The Way"
   }).eq("id", ambulanceId);
 
+  alert("Hospital Selected!");
 }
 
-supabaseClient
-  .channel("hospital-updates")
-  .on(
-    "postgres_changes",
-    { event: "UPDATE", schema: "public", table: "hospitals" },
-    payload => {
+/* 4️⃣ Emergency Button */
+async function emergency() {
 
-      if(payload.new.id === "H1") {
-        document.getElementById("hospitalStatus").innerText =
-          "Beds: " + payload.new.beds_available +
-          " | Doctor: " + payload.new.doctor_available;
-      }
+  await client.from("ambulances").update({
+    status: "EMERGENCY"
+  }).eq("id", ambulanceId);
 
-    }
-  )
-  .subscribe();
+  alert("Emergency Sent to Police & Hospital!");
+}
 
 </script>
-
 </body>
 </html>
