@@ -1,19 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Hospital Debug Final</title>
+  <title>Smart Ambulance - Supabase Test</title>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<h2>Supabase Connection Test</h2>
-<div id="result">Checking...</div>
+<h2>🚑 Smart Ambulance Panel</h2>
+
+<p id="status">Connecting to Supabase...</p>
+<div id="hospitalList"></div>
 
 <script>
 window.onload = async function() {
 
   if (!window.supabase) {
-    document.getElementById("result").innerText = "Supabase library not loaded!";
+    document.getElementById("status").innerText =
+      "Supabase library not loaded!";
     return;
   }
 
@@ -21,7 +24,7 @@ window.onload = async function() {
 
   const client = createClient(
     "https://inlkqessbewmxmtfvzfe.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubGtxZXNzYmV3bXhtdGZ2emZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjgxODYsImV4cCI6MjA4NDY0NDE4Nn0.5qiSgu3WlXJW4ARwwLC5XV6zvMwfGdH_xtUlu_qat0I"
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndycXdoeWtnbnRrZmFxaWVmamVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNzM3OTUsImV4cCI6MjA4NDY0OTc5NX0.t_GEclFobEHRhAhB2W6clKGxbEHKmjbslD0cLmalIMU"
   );
 
   try {
@@ -30,16 +33,36 @@ window.onload = async function() {
       .select("*");
 
     if (error) {
-      document.getElementById("result").innerText =
+      document.getElementById("status").innerText =
         "ERROR: " + error.message;
       console.error(error);
-    } else {
-      document.getElementById("result").innerText =
-        "SUCCESS! Hospitals found: " + data.length;
-      console.log(data);
+      return;
     }
+
+    document.getElementById("status").innerText =
+      "Connected! Hospitals found: " + data.length;
+
+    if (data.length === 0) {
+      document.getElementById("hospitalList").innerText =
+        "No hospitals found in database.";
+      return;
+    }
+
+    let list = document.getElementById("hospitalList");
+    list.innerHTML = "<h3>Hospital List:</h3>";
+
+    data.forEach(h => {
+      let div = document.createElement("div");
+      div.innerText =
+        h.name +
+        " | Beds: " + h.beds_available +
+        " | Doctor: " + (h.doctor_available ? "Yes" : "No");
+
+      list.appendChild(div);
+    });
+
   } catch (err) {
-    document.getElementById("result").innerText =
+    document.getElementById("status").innerText =
       "FETCH FAILED: " + err.message;
     console.error(err);
   }
