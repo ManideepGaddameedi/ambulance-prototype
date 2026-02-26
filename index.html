@@ -1,29 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Smart Ambulance - Hospital List</title>
+  <title>Smart Ambulance - Fresh Test</title>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<h2>🚑 Smart Ambulance Panel</h2>
-<p id="status">Connecting to Supabase...</p>
+<h2>🚑 Smart Ambulance System</h2>
+<p id="status">Connecting...</p>
 <div id="hospitalList"></div>
 
 <script>
 window.onload = async function () {
 
-  if (!window.supabase) {
-    document.getElementById("status").innerText =
-      "Supabase library not loaded!";
-    return;
-  }
-
   const { createClient } = window.supabase;
 
   const supabase = createClient(
-    "https://wrqwhykgnktfaaqiefjek.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndycXdoeWtnbnRrZmFxaWVmamVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNzM3OTUsImV4cCI6MjA4NDY0OTc5NX0.t_GEclFobEHRhAhB2W6clKGxbEHKmjbslD0cLmalIMU"
+    "https://cfmxqwaopfahthflqgih.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
   );
 
   try {
@@ -40,15 +34,14 @@ window.onload = async function () {
     }
 
     document.getElementById("status").innerText =
-      "Connected Successfully! Hospitals found: " + data.length;
-
-    if (data.length === 0) {
-      document.getElementById("hospitalList").innerText =
-        "No hospitals found in database.";
-      return;
-    }
+      "✅ Connected! Hospitals found: " + data.length;
 
     const list = document.getElementById("hospitalList");
+
+    if (data.length === 0) {
+      list.innerText = "No hospitals found.";
+      return;
+    }
 
     data.forEach(h => {
       const div = document.createElement("div");
@@ -66,7 +59,7 @@ window.onload = async function () {
 
   } catch (err) {
     document.getElementById("status").innerText =
-      "FETCH FAILED: " + err.message;
+      "❌ FETCH FAILED: " + err.message;
     console.error(err);
   }
 };
