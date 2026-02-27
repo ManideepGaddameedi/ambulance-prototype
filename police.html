@@ -21,12 +21,20 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
 );
 
+/* Map */
 const map = L.map('map').setView([17.3850,78.4867],13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-let marker = L.marker([17.3850,78.4867]).addTo(map);
+/* Ambulance icon */
+const ambulanceIcon = L.icon({
+  iconUrl:"https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
+  iconSize:[40,40],
+  iconAnchor:[20,20]
+});
 
-/* Load initial location */
+let marker = L.marker([17.3850,78.4867],{icon:ambulanceIcon}).addTo(map);
+
+/* Load Initial Position */
 async function loadInitial(){
   const { data } = await supabase
     .from("ambulance_location")
@@ -41,9 +49,8 @@ async function loadInitial(){
 }
 await loadInitial();
 
-/* Realtime */
-supabase
-.channel("ambulance-live")
+/* Realtime Subscription */
+supabase.channel("live-track")
 .on(
   "postgres_changes",
   {
@@ -55,8 +62,13 @@ supabase
 
     if(payload.new.ambulance_id !== 1) return;
 
-    marker.setLatLng([payload.new.lat,payload.new.lng]);
-    map.panTo([payload.new.lat,payload.new.lng]);
+    const lat = payload.new.lat;
+    const lng = payload.new.lng;
+
+    console.log("Realtime:",lat,lng);
+
+    marker.setLatLng([lat,lng]);
+    map.panTo([lat,lng]);
   }
 )
 .subscribe();
