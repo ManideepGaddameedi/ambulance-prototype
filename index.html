@@ -20,17 +20,11 @@
       box-shadow:0 15px 40px rgba(0,0,0,0.3);
       text-align:center;
     }
-    select,button{
+    select{
       width:100%;
       padding:10px;
       margin-top:10px;
       border-radius:8px;
-    }
-    button{
-      background:red;
-      color:white;
-      border:none;
-      cursor:pointer;
     }
   </style>
 </head>
@@ -56,14 +50,11 @@ const supabase = createClient(
 let currentLat = 0;
 let currentLng = 0;
 
-/* Load Hospitals */
+/* Load hospitals */
 async function loadHospitals(){
-  const { data, error } = await supabase.from("hospitals").select("*");
-  if(error){ console.log(error); return; }
-
+  const { data } = await supabase.from("hospitals").select("*");
   const dropdown = document.getElementById("hospitalDropdown");
-  dropdown.innerHTML = "";
-
+  dropdown.innerHTML="";
   data.forEach(h=>{
     const option=document.createElement("option");
     option.value=h.id;
@@ -75,6 +66,7 @@ await loadHospitals();
 
 /* GPS Tracking */
 navigator.geolocation.watchPosition(async(pos)=>{
+
   currentLat = pos.coords.latitude;
   currentLng = pos.coords.longitude;
 
@@ -86,9 +78,10 @@ navigator.geolocation.watchPosition(async(pos)=>{
     {ambulance_id:1, lat:currentLat, lng:currentLng},
     {onConflict:"ambulance_id"}
   );
+
 });
 
-/* Select Destination */
+/* Set Destination */
 document.getElementById("hospitalDropdown")
 .addEventListener("change", async function(){
 
@@ -105,7 +98,6 @@ document.getElementById("hospitalDropdown")
   })
   .eq("ambulance_id",1);
 
-  alert("🏥 Destination Set Successfully");
 });
 
 </script>
