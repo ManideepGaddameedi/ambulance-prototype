@@ -1,24 +1,80 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>🏥 Hospital Dashboard</title>
+  <title>🏥 Hospital Control Panel</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
-    body { font-family: Arial; }
-    #map { height: 500px; margin-top: 10px; }
-    .panel { margin-top: 15px; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #1d4350, #a43931);
+      color: white;
+    }
+
+    .header {
+      padding: 20px;
+      text-align: center;
+      font-size: 22px;
+      font-weight: bold;
+      background: rgba(0,0,0,0.3);
+    }
+
+    .container {
+      padding: 20px;
+    }
+
+    #map {
+      height: 450px;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+
+    .panel {
+      margin-top: 20px;
+      background: rgba(255,255,255,0.1);
+      padding: 15px;
+      border-radius: 12px;
+    }
+
+    input {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0;
+      border-radius: 8px;
+      border: none;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      background: #00c853;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #00a844;
+    }
   </style>
 </head>
 <body>
 
-<h2>🏥 Hospital Live Ambulance Tracking</h2>
-<div id="map"></div>
+<div class="header">🏥 Hospital Emergency Dashboard</div>
 
-<div class="panel">
-  <h3>Update Availability</h3>
-  Beds: <input type="number" id="beds"><br><br>
-  Doctors: <input type="number" id="doctors"><br><br>
-  <button id="updateBtn">Update Availability</button>
+<div class="container">
+  <div id="map"></div>
+
+  <div class="panel">
+    <h3>Update Resource Availability</h3>
+    Beds:
+    <input type="number" id="beds">
+    Doctors:
+    <input type="number" id="doctors">
+    <button id="updateBtn">Update Availability</button>
+  </div>
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -27,22 +83,13 @@
 
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-/* -------- SUPABASE INIT -------- */
-
 const supabase = createClient(
   "https://cfmxqwaopfahthflqgih.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
 );
 
-/* -------- MAP INIT -------- */
-
 const map = L.map('map').setView([17.3850, 78.4867], 13);
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: "© OpenStreetMap"
-}).addTo(map);
-
-/* -------- CUSTOM AMBULANCE ICON -------- */
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 const ambulanceIcon = L.icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
@@ -50,58 +97,35 @@ const ambulanceIcon = L.icon({
   iconAnchor: [20, 20]
 });
 
-/* -------- CREATE MARKER -------- */
-
-let ambulanceMarker = L.marker([17.3850, 78.4867], {
-  icon: ambulanceIcon
-}).addTo(map);
-
+let ambulanceMarker = L.marker([17.3850, 78.4867], { icon: ambulanceIcon }).addTo(map);
 let previousLatLng = [17.3850, 78.4867];
 
-/* -------- SMOOTH MOVE FUNCTION -------- */
-
 function smoothMove(newLat, newLng) {
-
   const steps = 25;
   const delay = 20;
-
   let latStep = (newLat - previousLatLng[0]) / steps;
   let lngStep = (newLng - previousLatLng[1]) / steps;
-
   let i = 0;
 
   const interval = setInterval(() => {
-
     if (i >= steps) {
       clearInterval(interval);
       previousLatLng = [newLat, newLng];
       return;
     }
-
     previousLatLng[0] += latStep;
     previousLatLng[1] += lngStep;
-
     ambulanceMarker.setLatLng(previousLatLng);
-
     i++;
-
   }, delay);
 }
 
-/* -------- LOAD INITIAL LOCATION -------- */
-
 async function loadInitialLocation() {
-
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from("ambulance_location")
     .select("*")
     .eq("ambulance_id", 1)
     .single();
-
-  if (error) {
-    console.log("Initial Fetch Error:", error);
-    return;
-  }
 
   if (data) {
     previousLatLng = [data.lat, data.lng];
@@ -112,61 +136,35 @@ async function loadInitialLocation() {
 
 await loadInitialLocation();
 
-/* -------- REALTIME SUBSCRIPTION -------- */
-
-const channel = supabase.channel("hospital-ambulance-tracking");
+const channel = supabase.channel("hospital-track");
 
 channel
-  .on(
-    "postgres_changes",
-    {
-      event: "*",
-      schema: "public",
-      table: "ambulance_location"
-    },
+  .on("postgres_changes",
+    { event: "*", schema: "public", table: "ambulance_location" },
     (payload) => {
-
       if (!payload.new) return;
-
-      const lat = payload.new.lat;
-      const lng = payload.new.lng;
-
-      smoothMove(lat, lng);
-      map.panTo([lat, lng]);
-
+      smoothMove(payload.new.lat, payload.new.lng);
+      map.panTo([payload.new.lat, payload.new.lng]);
     }
   )
-  .subscribe((status) => {
-    console.log("Realtime Status:", status);
-  });
-
-/* -------- UPDATE AVAILABILITY -------- */
+  .subscribe();
 
 document.getElementById("updateBtn")
 .addEventListener("click", async () => {
-
-  const beds = document.getElementById("beds").value;
-  const doctors = document.getElementById("doctors").value;
-
   await supabase
     .from("hospitals")
     .update({
-      available_beds: beds,
-      available_doctors: doctors
+      available_beds: document.getElementById("beds").value,
+      available_doctors: document.getElementById("doctors").value
     })
     .eq("id", 1);
-
   alert("Availability Updated");
-
 });
-
-/* -------- CLEANUP -------- */
 
 window.addEventListener("beforeunload", () => {
   supabase.removeChannel(channel);
 });
 
 </script>
-
 </body>
 </html>
