@@ -34,9 +34,51 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: "© OpenStreetMap"
 }).addTo(map);
 
-let ambulanceMarker = L.marker([17.3850, 78.4867])
-  .addTo(map)
-  .bindPopup("🚑 Ambulance");
+/* -------- CUSTOM AMBULANCE ICON -------- */
+
+const ambulanceIcon = L.icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
+  iconSize: [40, 40],
+  iconAnchor: [20, 20]
+});
+
+/* -------- CREATE MARKER -------- */
+
+let ambulanceMarker = L.marker([17.3850, 78.4867], {
+  icon: ambulanceIcon
+}).addTo(map);
+
+let previousLatLng = [17.3850, 78.4867];
+
+/* -------- SMOOTH MOVE FUNCTION -------- */
+
+function smoothMove(newLat, newLng) {
+
+  const steps = 25;
+  const delay = 20;
+
+  let latStep = (newLat - previousLatLng[0]) / steps;
+  let lngStep = (newLng - previousLatLng[1]) / steps;
+
+  let i = 0;
+
+  const interval = setInterval(() => {
+
+    if (i >= steps) {
+      clearInterval(interval);
+      previousLatLng = [newLat, newLng];
+      return;
+    }
+
+    previousLatLng[0] += latStep;
+    previousLatLng[1] += lngStep;
+
+    ambulanceMarker.setLatLng(previousLatLng);
+
+    i++;
+
+  }, delay);
+}
 
 /* -------- LOAD INITIAL LOCATION -------- */
 
@@ -54,6 +96,7 @@ async function loadInitialLocation() {
   }
 
   if (data) {
+    previousLatLng = [data.lat, data.lng];
     ambulanceMarker.setLatLng([data.lat, data.lng]);
     map.setView([data.lat, data.lng], 15);
   }
@@ -75,22 +118,21 @@ channel
     },
     (payload) => {
 
-      console.log("Realtime Payload:", payload);
-
       if (!payload.new) return;
 
       const lat = payload.new.lat;
       const lng = payload.new.lng;
 
-      ambulanceMarker.setLatLng([lat, lng]);
-      map.setView([lat, lng], 15);
+      smoothMove(lat, lng);
+      map.panTo([lat, lng]);
+
     }
   )
   .subscribe((status) => {
     console.log("Realtime Status:", status);
   });
 
-/* -------- CLEANUP (PREVENT CHANNEL ERROR LOOP) -------- */
+/* -------- CLEANUP -------- */
 
 window.addEventListener("beforeunload", () => {
   supabase.removeChannel(channel);
