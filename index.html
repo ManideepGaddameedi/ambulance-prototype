@@ -4,39 +4,39 @@
   <title>🚑 Ambulance Panel</title>
   <style>
     body {
-      margin: 0;
-      font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #ff4d4d, #b30000);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
+      margin:0;
+      font-family:Segoe UI;
+      background:linear-gradient(135deg,#ff4d4d,#b30000);
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      height:100vh;
     }
-    .container {
-      background: white;
-      width: 420px;
-      padding: 30px;
-      border-radius: 20px;
-      box-shadow: 0 15px 40px rgba(0,0,0,0.3);
-      text-align: center;
+    .box{
+      background:white;
+      width:420px;
+      padding:25px;
+      border-radius:20px;
+      box-shadow:0 15px 40px rgba(0,0,0,0.3);
+      text-align:center;
     }
-    select, button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      border-radius: 8px;
+    select,button{
+      width:100%;
+      padding:10px;
+      margin-top:10px;
+      border-radius:8px;
     }
-    button {
-      background: red;
-      color: white;
-      border: none;
-      cursor: pointer;
+    button{
+      background:red;
+      color:white;
+      border:none;
+      cursor:pointer;
     }
   </style>
 </head>
 <body>
 
-<div class="container">
+<div class="box">
   <h2>🚑 Smart Ambulance</h2>
   <p id="status">Waiting for GPS...</p>
 
@@ -50,67 +50,62 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const supabase = createClient(
   "https://cfmxqwaopfahthflqgih.supabase.co",
-  "YOUR_ANON_KEY"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
 );
 
 let currentLat = 0;
 let currentLng = 0;
 
 /* Load Hospitals */
-async function loadHospitals() {
-  const { data } = await supabase.from("hospitals").select("*");
+async function loadHospitals(){
+  const { data, error } = await supabase.from("hospitals").select("*");
+  if(error){ console.log(error); return; }
+
   const dropdown = document.getElementById("hospitalDropdown");
   dropdown.innerHTML = "";
 
-  data.forEach(h => {
-    const option = document.createElement("option");
-    option.value = h.id;
-    option.text = h.name;
+  data.forEach(h=>{
+    const option=document.createElement("option");
+    option.value=h.id;
+    option.text=h.name;
     dropdown.appendChild(option);
   });
 }
 await loadHospitals();
 
 /* GPS Tracking */
-navigator.geolocation.watchPosition(async (pos) => {
-
+navigator.geolocation.watchPosition(async(pos)=>{
   currentLat = pos.coords.latitude;
   currentLng = pos.coords.longitude;
 
   document.getElementById("status").innerText =
     `📍 ${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`;
 
-  await supabase
-    .from("ambulance_location")
-    .upsert(
-      { ambulance_id: 1, lat: currentLat, lng: currentLng },
-      { onConflict: "ambulance_id" }
-    );
-
+  await supabase.from("ambulance_location")
+  .upsert(
+    {ambulance_id:1, lat:currentLat, lng:currentLng},
+    {onConflict:"ambulance_id"}
+  );
 });
 
-/* Select Hospital */
+/* Select Destination */
 document.getElementById("hospitalDropdown")
-.addEventListener("change", async function() {
-
-  const hospitalId = this.value;
+.addEventListener("change", async function(){
 
   const { data } = await supabase
     .from("hospitals")
     .select("*")
-    .eq("id", hospitalId)
+    .eq("id", this.value)
     .single();
 
-  await supabase
-    .from("ambulance_location")
-    .update({
-      dest_lat: data.lat,
-      dest_lng: data.lng
-    })
-    .eq("ambulance_id", 1);
+  await supabase.from("ambulance_location")
+  .update({
+    dest_lat:data.lat,
+    dest_lng:data.lng
+  })
+  .eq("ambulance_id",1);
 
-  alert("🏥 Destination Set");
-
+  alert("🏥 Destination Set Successfully");
 });
 
 </script>
