@@ -2,16 +2,100 @@
 <html>
 <head>
   <title>🚑 Ambulance Panel</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #ff4d4d, #b30000);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .container {
+      background: white;
+      width: 400px;
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+      text-align: center;
+    }
+
+    .title {
+      font-size: 22px;
+      font-weight: bold;
+      color: #b30000;
+      margin-bottom: 10px;
+    }
+
+    .status-box {
+      background: #f5f5f5;
+      padding: 12px;
+      border-radius: 10px;
+      margin: 15px 0;
+      font-size: 14px;
+      color: #333;
+      min-height: 20px;
+    }
+
+    .btn-alert {
+      width: 100%;
+      padding: 12px;
+      background: #ff0000;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    .btn-alert:hover {
+      background: #cc0000;
+      transform: scale(1.03);
+    }
+
+    .footer {
+      margin-top: 15px;
+      font-size: 12px;
+      color: gray;
+    }
+
+    .pulse {
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(255,0,0,0.6); }
+      70% { box-shadow: 0 0 0 15px rgba(255,0,0,0); }
+      100% { box-shadow: 0 0 0 0 rgba(255,0,0,0); }
+    }
+  </style>
 </head>
+
 <body>
 
-<h2>🚑 Ambulance Live Tracking</h2>
-<p id="status">Waiting for GPS...</p>
-<button id="alertBtn">🚨 Send Emergency Alert</button>
+  <div class="container">
+    <div class="title">🚑 Smart Ambulance Control</div>
+
+    <div class="status-box pulse" id="status">
+      Waiting for GPS...
+    </div>
+
+    <button class="btn-alert" id="alertBtn">
+      🚨 SEND EMERGENCY ALERT
+    </button>
+
+    <div class="footer">
+      Real-Time Emergency Tracking System
+    </div>
+  </div>
 
 <script type="module">
 
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm"
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
 const supabase = createClient(
   "https://cfmxqwaopfahthflqgih.supabase.co",
@@ -34,7 +118,7 @@ navigator.geolocation.watchPosition(
     const lng = position.coords.longitude;
 
     document.getElementById("status").innerText =
-      "Live Location: " + lat + ", " + lng;
+      "📍 Live Location: " + lat.toFixed(5) + ", " + lng.toFixed(5);
 
     await supabase
       .from("ambulance_location")
@@ -67,7 +151,7 @@ document.getElementById("alertBtn").addEventListener("click", async () => {
       longitude: data.lng
     }]);
 
-  alert("🚨 Alert Sent to Police & Hospital");
+  alert("🚨 Emergency Alert Sent Successfully");
 
 });
 
