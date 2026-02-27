@@ -1,81 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>🏥 Hospital Control Panel</title>
+  <title>👮 Police Dashboard</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #1d4350, #a43931);
-      color: white;
-    }
-
-    .header {
-      padding: 20px;
-      text-align: center;
-      font-size: 22px;
-      font-weight: bold;
-      background: rgba(0,0,0,0.3);
-    }
-
-    .container {
-      padding: 20px;
-    }
-
-    #map {
-      height: 450px;
-      border-radius: 15px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-    }
-
-    .panel {
-      margin-top: 20px;
-      background: rgba(255,255,255,0.1);
-      padding: 15px;
-      border-radius: 12px;
-    }
-
-    input {
-      width: 100%;
-      padding: 8px;
-      margin: 5px 0;
-      border-radius: 8px;
-      border: none;
-    }
-
-    button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      background: #00c853;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #00a844;
-    }
+    #map { height: 500px; }
   </style>
 </head>
 <body>
 
-<div class="header">🏥 Hospital Emergency Dashboard</div>
-
-<div class="container">
-  <div id="map"></div>
-
-  <div class="panel">
-    <h3>Update Resource Availability</h3>
-    Beds:
-    <input type="number" id="beds">
-    Doctors:
-    <input type="number" id="doctors">
-    <button id="updateBtn">Update Availability</button>
-  </div>
-</div>
+<h2>🏥 Hospital Live Tracking</h2>
+<div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
@@ -85,85 +20,66 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const supabase = createClient(
   "https://cfmxqwaopfahthflqgih.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
+  "YOUR_ANON_KEY"
 );
 
 const map = L.map('map').setView([17.3850, 78.4867], 13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-const ambulanceIcon = L.icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
-  iconSize: [40, 40],
-  iconAnchor: [20, 20]
-});
+let marker = L.marker([17.3850, 78.4867]).addTo(map);
+let routeLine = null;
 
-let ambulanceMarker = L.marker([17.3850, 78.4867], { icon: ambulanceIcon }).addTo(map);
-let previousLatLng = [17.3850, 78.4867];
+/* Draw Route */
+async function drawRoute(startLat, startLng, destLat, destLng) {
 
-function smoothMove(newLat, newLng) {
-  const steps = 25;
-  const delay = 20;
-  let latStep = (newLat - previousLatLng[0]) / steps;
-  let lngStep = (newLng - previousLatLng[1]) / steps;
-  let i = 0;
+  const res = await fetch(
+    `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson`
+  );
 
-  const interval = setInterval(() => {
-    if (i >= steps) {
-      clearInterval(interval);
-      previousLatLng = [newLat, newLng];
-      return;
-    }
-    previousLatLng[0] += latStep;
-    previousLatLng[1] += lngStep;
-    ambulanceMarker.setLatLng(previousLatLng);
-    i++;
-  }, delay);
+  const data = await res.json();
+  const route = data.routes[0];
+
+  if (routeLine) map.removeLayer(routeLine);
+
+  routeLine = L.geoJSON(route.geometry).addTo(map);
+
+  alert(`Distance: ${(route.distance/1000).toFixed(2)} km
+ETA: ${(route.duration/60).toFixed(0)} mins`);
 }
 
-async function loadInitialLocation() {
-  const { data } = await supabase
-    .from("ambulance_location")
-    .select("*")
-    .eq("ambulance_id", 1)
-    .single();
+/* Realtime */
+supabase.channel("track")
+.on("postgres_changes",
+  { event: "*", schema: "public", table: "ambulance_location" },
+  async (payload) => {
 
-  if (data) {
-    previousLatLng = [data.lat, data.lng];
-    ambulanceMarker.setLatLng([data.lat, data.lng]);
-    map.setView([data.lat, data.lng], 15);
+    const lat = payload.new.lat;
+    const lng = payload.new.lng;
+
+    marker.setLatLng([lat, lng]);
+    map.panTo([lat, lng]);
+
+    const { data } = await supabase
+      .from("emergency_alerts")
+      .select("*")
+      .eq("status", "ACTIVE")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (data.length > 0) {
+
+      const hospital = await supabase
+        .from("hospitals")
+        .select("*")
+        .eq("id", data[0].hospital_id)
+        .single();
+
+      drawRoute(lat, lng, hospital.data.lat, hospital.data.lng);
+    }
+
   }
-}
-
-await loadInitialLocation();
-
-const channel = supabase.channel("hospital-track");
-
-channel
-  .on("postgres_changes",
-    { event: "*", schema: "public", table: "ambulance_location" },
-    (payload) => {
-      if (!payload.new) return;
-      smoothMove(payload.new.lat, payload.new.lng);
-      map.panTo([payload.new.lat, payload.new.lng]);
-    }
-  )
-  .subscribe();
-
-document.getElementById("updateBtn")
-.addEventListener("click", async () => {
-  await supabase
-    .from("hospitals")
-    .update({
-      available_beds: document.getElementById("beds").value,
-      available_doctors: document.getElementById("doctors").value
-    })
-    .eq("id", 1);
-  alert("Availability Updated");
-});
-
-window.addEventListener("beforeunload", () => {
-  supabase.removeChannel(channel);
-});
+)
+.subscribe();
 
 </script>
 </body>
