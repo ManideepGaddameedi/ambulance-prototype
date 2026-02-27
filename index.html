@@ -5,14 +5,11 @@
 </head>
 <body>
 
-<h2>🚑 Ambulance Dashboard</h2>
+<h2>🚑 Ambulance Live Tracking</h2>
+
+<p id="status">Waiting for GPS...</p>
 
 <button id="alertBtn">🚨 Send Emergency Alert</button>
-<br><br>
-
-<select id="hospitalDropdown">
-  <option>Select Hospital</option>
-</select>
 
 <script type="module">
 
@@ -23,93 +20,70 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
 );
 
-let currentLat = 17.3850;
-let currentLng = 78.4867;
+/* -------- Ensure Row Exists -------- */
+await supabase
+  .from("ambulance_location")
+  .upsert({
+    ambulance_id: 1,
+    lat: 17.3850,
+    lng: 78.4867
+  }, { onConflict: 'ambulance_id' });
 
-/* LOCATION UPDATE */
-navigator.geolocation.watchPosition(async (pos) => {
-  currentLat = pos.coords.latitude;
-  currentLng = pos.coords.longitude;
+/* -------- LIVE GPS TRACKING -------- */
+navigator.geolocation.watchPosition(
+  async (position) => {
 
-  await supabase
-    .from("ambulance_location")
-    .update({ lat: currentLat, lng: currentLng })
-    .eq("ambulance_id", 1);
+    const lat = position.coords.latitude;
+    const lng = position.coords.longitude;
 
-});
+    document.getElementById("status").innerText =
+      "Live Location: " + lat + ", " + lng;
 
-/* SEND ALERT */
+    const { error } = await supabase
+      .from("ambulance_location")
+      .upsert({
+        ambulance_id: 1,
+        lat: lat,
+        lng: lng
+      }, { onConflict: 'ambulance_id' });
+
+    if(error){
+      console.log("Update Error:", error);
+    }
+
+  },
+  (error) => {
+    console.log("GPS Error:", error);
+  },
+  {
+    enableHighAccuracy: true,
+    maximumAge: 0,
+    timeout: 5000
+  }
+);
+
+/* -------- SEND ALERT -------- */
 document.getElementById("alertBtn").addEventListener("click", async () => {
 
-  const { error } = await supabase
+  const { data } = await supabase
+    .from("ambulance_location")
+    .select("*")
+    .eq("ambulance_id", 1)
+    .single();
+
+  await supabase
     .from("emergency_alerts")
     .insert([{
       ambulance_id: 1,
-      latitude: currentLat,
-      longitude: currentLng
+      latitude: data.lat,
+      longitude: data.lng
     }]);
 
-  if(error){
-    alert("Error sending alert");
-    console.log(error);
-    return;
-  }
-
-  alert("🚨 Alert Sent to Police");
-
-  loadHospitals();
-});
-
-/* LOAD HOSPITALS */
-async function loadHospitals(){
-
-  const { data, error } = await supabase
-    .from("hospitals")
-    .select("*");
-
-  if(error){
-    console.log(error);
-    return;
-  }
-
-  const dropdown = document.getElementById("hospitalDropdown");
-  dropdown.innerHTML = "";
-
-  data.forEach(h => {
-
-    let distance = Math.sqrt(
-      Math.pow(currentLat - h.lat, 2) +
-      Math.pow(currentLng - h.lng, 2)
-    ) * 111;
-
-    let eta = (distance / 40) * 60;
-
-    const option = document.createElement("option");
-    option.value = h.id;
-    option.textContent =
-      `${h.name} - ${distance.toFixed(2)} km - ETA ${eta.toFixed(0)} mins`;
-
-    dropdown.appendChild(option);
-  });
-
-}
-
-/* SELECT HOSPITAL */
-document.getElementById("hospitalDropdown")
-.addEventListener("change", async (e) => {
-
-  const hospitalId = e.target.value;
-  if(!hospitalId) return;
-
-  await supabase
-    .from("emergency_alerts")
-    .update({ hospital_id: hospitalId })
-    .eq("status", "ACTIVE");
-
-  alert("🏥 Hospital Assigned");
+  alert("🚨 Alert Sent");
 
 });
 
 </script>
+
 </body>
 </html>
