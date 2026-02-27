@@ -16,7 +16,7 @@
 
     .container {
       background: white;
-      width: 400px;
+      width: 420px;
       padding: 30px;
       border-radius: 20px;
       box-shadow: 0 15px 40px rgba(0,0,0,0.3);
@@ -57,6 +57,14 @@
       transform: scale(1.03);
     }
 
+    select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+
     .footer {
       margin-top: 15px;
       font-size: 12px;
@@ -77,21 +85,26 @@
 
 <body>
 
-  <div class="container">
-    <div class="title">🚑 Smart Ambulance Control</div>
+<div class="container">
+  <div class="title">🚑 Smart Ambulance Control</div>
 
-    <div class="status-box pulse" id="status">
-      Waiting for GPS...
-    </div>
-
-    <button class="btn-alert" id="alertBtn">
-      🚨 SEND EMERGENCY ALERT
-    </button>
-
-    <div class="footer">
-      Real-Time Emergency Tracking System
-    </div>
+  <div class="status-box pulse" id="status">
+    Waiting for GPS...
   </div>
+
+  <button class="btn-alert" id="alertBtn">
+    🚨 SEND EMERGENCY ALERT
+  </button>
+
+  <h4 style="margin-top:20px;">🏥 Nearby Hospitals</h4>
+  <select id="hospitalDropdown">
+    <option>Detecting location...</option>
+  </select>
+
+  <div class="footer">
+    Real-Time Emergency Tracking System
+  </div>
+</div>
 
 <script type="module">
 
@@ -102,13 +115,65 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
 );
 
-/* Ensure row exists */
+/* Ensure ambulance row exists */
 await supabase
   .from("ambulance_location")
   .upsert(
     { ambulance_id: 1, lat: 17.3850, lng: 78.4867 },
     { onConflict: "ambulance_id" }
   );
+
+/* Distance Calculation (Haversine Formula) */
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/* Load Nearby Hospitals */
+async function loadNearbyHospitals(currentLat, currentLng) {
+
+  const { data, error } = await supabase
+    .from("hospitals")
+    .select("*");
+
+  if (error) {
+    console.log(error);
+    return;
+  }
+
+  const dropdown = document.getElementById("hospitalDropdown");
+  dropdown.innerHTML = "";
+
+  data.forEach(hospital => {
+
+    const distance = calculateDistance(
+      currentLat,
+      currentLng,
+      hospital.lat,
+      hospital.lng
+    );
+
+    const eta = (distance / 40) * 60;
+
+    const option = document.createElement("option");
+    option.value = hospital.id;
+    option.text =
+      `${hospital.name} - ${distance.toFixed(2)} km - ETA ${eta.toFixed(0)} mins`;
+
+    dropdown.appendChild(option);
+  });
+}
 
 /* Live GPS Tracking */
 navigator.geolocation.watchPosition(
@@ -127,6 +192,8 @@ navigator.geolocation.watchPosition(
         { onConflict: "ambulance_id" }
       );
 
+    loadNearbyHospitals(lat, lng);
+
   },
   (error) => {
     console.log("GPS Error:", error);
@@ -134,7 +201,7 @@ navigator.geolocation.watchPosition(
   { enableHighAccuracy: true }
 );
 
-/* Send Alert */
+/* Send Emergency Alert */
 document.getElementById("alertBtn").addEventListener("click", async () => {
 
   const { data } = await supabase
