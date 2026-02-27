@@ -1,69 +1,90 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Smart Ambulance - Fresh Test</title>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <title>Ambulance Panel</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 </head>
 <body>
 
-<h2>🚑 Smart Ambulance System</h2>
-<p id="status">Connecting...</p>
-<div id="hospitalList"></div>
+<h2>🚑 Ambulance Dashboard</h2>
+
+<button onclick="sendAlert()" style="background:red;color:white;padding:10px;">
+🚨 SEND EMERGENCY ALERT
+</button>
+
+<br><br>
+
+<select id="hospitalDropdown" onchange="selectHospital(this.value)">
+<option>Select Hospital</option>
+</select>
 
 <script>
-window.onload = async function () {
 
-  const { createClient } = window.supabase;
+const supabase = window.supabase.createClient(
+  "YOUR_SUPABASE_URL",
+  "YOUR_ANON_KEY"
+);
 
-  const supabase = createClient(
-    "https://cfmxqwaopfahthflqgih.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
-  );
+let currentLat = 0;
+let currentLng = 0;
 
-  try {
+navigator.geolocation.watchPosition(async (pos)=>{
 
-    const { data, error } = await supabase
-      .from("hospitals")
-      .select("*");
+  currentLat = pos.coords.latitude;
+  currentLng = pos.coords.longitude;
 
-    if (error) {
-      document.getElementById("status").innerText =
-        "Error: " + error.message;
-      console.error(error);
-      return;
-    }
+  await supabase
+  .from("ambulance_location")
+  .update({ lat: currentLat, lng: currentLng })
+  .eq("ambulance_id", 1);
 
-    document.getElementById("status").innerText =
-      "✅ Connected! Hospitals found: " + data.length;
+});
 
-    const list = document.getElementById("hospitalList");
+async function sendAlert(){
 
-    if (data.length === 0) {
-      list.innerText = "No hospitals found.";
-      return;
-    }
+  await supabase.from("emergency_alerts").insert([{
+    ambulance_id:1,
+    latitude: currentLat,
+    longitude: currentLng
+  }]);
 
-    data.forEach(h => {
-      const div = document.createElement("div");
-      div.style.marginBottom = "10px";
-      div.style.padding = "8px";
-      div.style.border = "1px solid #ccc";
+  loadHospitals();
+}
 
-      div.innerText =
-        "🏥 " + h.name +
-        " | Beds: " + h.beds_available +
-        " | Doctor: " + (h.doctor_available ? "Yes" : "No");
+async function loadHospitals(){
 
-      list.appendChild(div);
-    });
+  const { data } = await supabase.from("hospitals").select("*");
 
-  } catch (err) {
-    document.getElementById("status").innerText =
-      "❌ FETCH FAILED: " + err.message;
-    console.error(err);
-  }
-};
+  const dropdown = document.getElementById("hospitalDropdown");
+  dropdown.innerHTML = "";
+
+  data.forEach(h => {
+
+    let distance = Math.sqrt(
+      Math.pow(currentLat - h.lat,2) +
+      Math.pow(currentLng - h.lng,2)
+    ) * 111;
+
+    let eta = (distance / 40) * 60;
+
+    let option = document.createElement("option");
+    option.value = h.id;
+    option.text = `${h.name} - ${distance.toFixed(2)} km - ETA ${eta.toFixed(0)} mins`;
+
+    dropdown.appendChild(option);
+  });
+}
+
+async function selectHospital(id){
+
+  await supabase
+  .from("emergency_alerts")
+  .update({ hospital_id:id })
+  .eq("status","ACTIVE");
+
+  alert("Hospital Selected & Alert Sent");
+}
+
 </script>
-
 </body>
 </html>
