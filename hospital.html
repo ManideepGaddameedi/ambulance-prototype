@@ -1,25 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Hospital Dashboard</title>
-
+  <title>🏥 Hospital Dashboard</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-
   <style>
-    #map { height: 500px; width: 100%; }
+    #map { height: 500px; }
   </style>
 </head>
 <body>
 
-<h2>🏥 Hospital Live Ambulance Tracking</h2>
-
+<h2>🏥 Hospital Live Tracking</h2>
 <div id="map"></div>
 
 <br>
-
 Beds: <input type="number" id="beds"><br><br>
 Doctors: <input type="number" id="doctors"><br><br>
-
 <button id="updateBtn">Update Availability</button>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -33,49 +28,47 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
 );
 
-const hospitalId = 1;
-
-/* -------- Initialize Map -------- */
+/* Map */
 const map = L.map('map').setView([17.3850, 78.4867], 13);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap'
-}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
+.addTo(map);
 
-let ambulanceMarker = L.marker([17.3850, 78.4867]).addTo(map);
+let ambulanceMarker = L.marker([17.3850, 78.4867])
+.addTo(map)
+.bindPopup("🚑 Ambulance");
 
-/* -------- Real-time Location -------- */
+/* Realtime */
 supabase
-.channel("hospital-location")
+.channel("hospital-tracking")
 .on(
   "postgres_changes",
-  { event: "UPDATE", schema: "public", table: "ambulance_location" },
+  { event: "*", schema: "public", table: "ambulance_location" },
   (payload) => {
+
+    if (!payload.new) return;
 
     const lat = payload.new.lat;
     const lng = payload.new.lng;
 
     ambulanceMarker.setLatLng([lat, lng]);
-    map.panTo([lat, lng]);
+    map.setView([lat, lng], 15);
 
   }
 )
 .subscribe();
 
-/* -------- Update Availability -------- */
+/* Update Availability */
 document.getElementById("updateBtn")
 .addEventListener("click", async () => {
-
-  const beds = document.getElementById("beds").value;
-  const doctors = document.getElementById("doctors").value;
 
   await supabase
     .from("hospitals")
     .update({
-      available_beds: beds,
-      available_doctors: doctors
+      available_beds: document.getElementById("beds").value,
+      available_doctors: document.getElementById("doctors").value
     })
-    .eq("id", hospitalId);
+    .eq("id", 1);
 
   alert("Availability Updated");
 
