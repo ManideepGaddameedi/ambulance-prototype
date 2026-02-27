@@ -1,68 +1,60 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Hospital Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <title>Hospital Dashboard</title>
 </head>
 <body>
 
-<h2>🏥 Hospital Panel</h2>
+<h2>🏥 Hospital Dashboard</h2>
 
 Beds: <input type="number" id="beds"><br><br>
 Doctors: <input type="number" id="doctors"><br><br>
 
-<button onclick="updateAvailability()">Update Availability</button>
+<button id="updateBtn">Update Availability</button>
 
-<div id="liveLocation"></div>
+<div id="locationBox"></div>
 
-<script>
+<script type="module">
 
-const supabase = window.supabase.createClient(
-  "YOUR_SUPABASE_URL",
-  "YOUR_ANON_KEY"
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm"
+
+const supabase = createClient(
+  "https://cfmxqwaopfahthflqgih.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
 );
 
-let hospitalId = 1; // change if needed
+const hospitalId = 1;
 
-async function updateAvailability(){
+/* UPDATE AVAILABILITY */
+document.getElementById("updateBtn")
+.addEventListener("click", async () => {
 
-  let beds = document.getElementById("beds").value;
-  let doctors = document.getElementById("doctors").value;
+  const beds = document.getElementById("beds").value;
+  const doctors = document.getElementById("doctors").value;
 
   await supabase
-  .from("hospitals")
-  .update({
-    available_beds:beds,
-    available_doctors:doctors
-  })
-  .eq("id", hospitalId);
+    .from("hospitals")
+    .update({
+      available_beds: beds,
+      available_doctors: doctors
+    })
+    .eq("id", hospitalId);
 
   alert("Availability Updated");
-}
 
-supabase
-.channel('live-location')
-.on('postgres_changes',{
-  event:'UPDATE',
-  schema:'public',
-  table:'ambulance_location'
-}, payload=>{
-  document.getElementById("liveLocation").innerHTML =
-  `Ambulance Location: ${payload.new.lat}, ${payload.new.lng}`;
-})
-.subscribe();
+});
 
+/* LOCATION LISTENER */
 supabase
-.channel('hospital-alert')
-.on('postgres_changes',{
-  event:'UPDATE',
-  schema:'public',
-  table:'emergency_alerts'
-}, payload=>{
-  if(payload.new.hospital_id == hospitalId){
-    alert("🚨 Emergency Assigned To Your Hospital!");
+.channel("hospital-location")
+.on(
+  "postgres_changes",
+  { event: "UPDATE", schema: "public", table: "ambulance_location" },
+  (payload) => {
+    document.getElementById("locationBox").innerHTML =
+      `Ambulance Location: ${payload.new.lat}, ${payload.new.lng}`;
   }
-})
+)
 .subscribe();
 
 </script>
