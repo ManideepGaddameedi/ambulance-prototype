@@ -20,26 +20,17 @@
       box-shadow: 0 15px 40px rgba(0,0,0,0.3);
       text-align: center;
     }
-    .status-box {
-      background: #f5f5f5;
-      padding: 12px;
-      border-radius: 10px;
-      margin: 15px 0;
-    }
-    button {
-      width: 100%;
-      padding: 12px;
-      background: red;
-      color: white;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-    }
-    select {
+    select, button {
       width: 100%;
       padding: 10px;
       margin-top: 10px;
       border-radius: 8px;
+    }
+    button {
+      background: red;
+      color: white;
+      border: none;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -47,14 +38,10 @@
 
 <div class="container">
   <h2>🚑 Smart Ambulance</h2>
-  <div class="status-box" id="status">Waiting for GPS...</div>
+  <p id="status">Waiting for GPS...</p>
 
-  <button id="alertBtn">🚨 SEND EMERGENCY ALERT</button>
-
-  <h4>🏥 Select Destination Hospital</h4>
-  <select id="hospitalDropdown">
-    <option>Loading hospitals...</option>
-  </select>
+  <h4>🏥 Select Destination</h4>
+  <select id="hospitalDropdown"></select>
 </div>
 
 <script type="module">
@@ -69,7 +56,22 @@ const supabase = createClient(
 let currentLat = 0;
 let currentLng = 0;
 
-/* Live GPS */
+/* Load Hospitals */
+async function loadHospitals() {
+  const { data } = await supabase.from("hospitals").select("*");
+  const dropdown = document.getElementById("hospitalDropdown");
+  dropdown.innerHTML = "";
+
+  data.forEach(h => {
+    const option = document.createElement("option");
+    option.value = h.id;
+    option.text = h.name;
+    dropdown.appendChild(option);
+  });
+}
+await loadHospitals();
+
+/* GPS Tracking */
 navigator.geolocation.watchPosition(async (pos) => {
 
   currentLat = pos.coords.latitude;
@@ -87,41 +89,27 @@ navigator.geolocation.watchPosition(async (pos) => {
 
 });
 
-/* Load Hospitals */
-async function loadHospitals() {
-
-  const { data } = await supabase.from("hospitals").select("*");
-
-  const dropdown = document.getElementById("hospitalDropdown");
-  dropdown.innerHTML = "";
-
-  data.forEach(h => {
-    const option = document.createElement("option");
-    option.value = h.id;
-    option.text = h.name;
-    dropdown.appendChild(option);
-  });
-}
-
-await loadHospitals();
-
 /* Select Hospital */
 document.getElementById("hospitalDropdown")
 .addEventListener("change", async function() {
 
   const hospitalId = this.value;
 
-  await supabase
-    .from("emergency_alerts")
-    .insert([{
-      ambulance_id: 1,
-      latitude: currentLat,
-      longitude: currentLng,
-      hospital_id: hospitalId,
-      status: "ACTIVE"
-    }]);
+  const { data } = await supabase
+    .from("hospitals")
+    .select("*")
+    .eq("id", hospitalId)
+    .single();
 
-  alert("🏥 Destination Selected");
+  await supabase
+    .from("ambulance_location")
+    .update({
+      dest_lat: data.lat,
+      dest_lng: data.lng
+    })
+    .eq("ambulance_id", 1);
+
+  alert("🏥 Destination Set");
 
 });
 
