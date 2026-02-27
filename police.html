@@ -9,7 +9,7 @@
 </head>
 <body>
 
-<h2>👮 Police Live Tracking</h2>
+<h2>👮 Live Ambulance Tracking</h2>
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -28,8 +28,17 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 let marker = L.marker([17.3850, 78.4867]).addTo(map);
 let routeLine = null;
+let infoControl = L.control({ position: 'bottomleft' });
 
-/* Draw Route */
+infoControl.onAdd = function () {
+  this._div = L.DomUtil.create('div');
+  this._div.style.background = "white";
+  this._div.style.padding = "8px";
+  this._div.style.borderRadius = "8px";
+  return this._div;
+};
+infoControl.addTo(map);
+
 async function drawRoute(startLat, startLng, destLat, destLng) {
 
   const res = await fetch(
@@ -37,46 +46,34 @@ async function drawRoute(startLat, startLng, destLat, destLng) {
   );
 
   const data = await res.json();
+  if (!data.routes) return;
+
   const route = data.routes[0];
 
   if (routeLine) map.removeLayer(routeLine);
-
   routeLine = L.geoJSON(route.geometry).addTo(map);
 
-  alert(`Distance: ${(route.distance/1000).toFixed(2)} km
-ETA: ${(route.duration/60).toFixed(0)} mins`);
+  const distance = (route.distance / 1000).toFixed(2);
+  const eta = (route.duration / 60).toFixed(0);
+
+  infoControl._div.innerHTML =
+    `<b>Distance:</b> ${distance} km<br>
+     <b>ETA:</b> ${eta} mins`;
 }
 
-/* Realtime */
 supabase.channel("track")
 .on("postgres_changes",
   { event: "*", schema: "public", table: "ambulance_location" },
   async (payload) => {
 
-    const lat = payload.new.lat;
-    const lng = payload.new.lng;
+    const { lat, lng, dest_lat, dest_lng } = payload.new;
 
     marker.setLatLng([lat, lng]);
     map.panTo([lat, lng]);
 
-    const { data } = await supabase
-      .from("emergency_alerts")
-      .select("*")
-      .eq("status", "ACTIVE")
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (data.length > 0) {
-
-      const hospital = await supabase
-        .from("hospitals")
-        .select("*")
-        .eq("id", data[0].hospital_id)
-        .single();
-
-      drawRoute(lat, lng, hospital.data.lat, hospital.data.lng);
+    if (dest_lat && dest_lng) {
+      drawRoute(lat, lng, dest_lat, dest_lng);
     }
-
   }
 )
 .subscribe();
