@@ -2,17 +2,27 @@
 <html>
 <head>
   <title>Hospital Dashboard</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+  <style>
+    #map { height: 500px; width: 100%; }
+  </style>
 </head>
 <body>
 
-<h2>🏥 Hospital Dashboard</h2>
+<h2>🏥 Hospital Live Ambulance Tracking</h2>
+
+<div id="map"></div>
+
+<br>
 
 Beds: <input type="number" id="beds"><br><br>
 Doctors: <input type="number" id="doctors"><br><br>
 
 <button id="updateBtn">Update Availability</button>
 
-<div id="locationBox"></div>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script type="module">
 
@@ -25,7 +35,34 @@ const supabase = createClient(
 
 const hospitalId = 1;
 
-/* UPDATE AVAILABILITY */
+/* -------- Initialize Map -------- */
+const map = L.map('map').setView([17.3850, 78.4867], 13);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap'
+}).addTo(map);
+
+let ambulanceMarker = L.marker([17.3850, 78.4867]).addTo(map);
+
+/* -------- Real-time Location -------- */
+supabase
+.channel("hospital-location")
+.on(
+  "postgres_changes",
+  { event: "UPDATE", schema: "public", table: "ambulance_location" },
+  (payload) => {
+
+    const lat = payload.new.lat;
+    const lng = payload.new.lng;
+
+    ambulanceMarker.setLatLng([lat, lng]);
+    map.panTo([lat, lng]);
+
+  }
+)
+.subscribe();
+
+/* -------- Update Availability -------- */
 document.getElementById("updateBtn")
 .addEventListener("click", async () => {
 
@@ -44,19 +81,7 @@ document.getElementById("updateBtn")
 
 });
 
-/* LOCATION LISTENER */
-supabase
-.channel("hospital-location")
-.on(
-  "postgres_changes",
-  { event: "UPDATE", schema: "public", table: "ambulance_location" },
-  (payload) => {
-    document.getElementById("locationBox").innerHTML =
-      `Ambulance Location: ${payload.new.lat}, ${payload.new.lng}`;
-  }
-)
-.subscribe();
-
 </script>
+
 </body>
 </html>
