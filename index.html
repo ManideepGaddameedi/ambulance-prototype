@@ -34,7 +34,7 @@
   <h2>🚑 Smart Ambulance</h2>
   <p id="status">Waiting for GPS...</p>
 
-  <h4>🏥 Select Destination</h4>
+  <h4>🏥 Nearest Hospitals</h4>
   <select id="hospitalDropdown"></select>
 </div>
 
@@ -50,19 +50,59 @@ const supabase = createClient(
 let currentLat = 0;
 let currentLng = 0;
 
-/* Load hospitals */
-async function loadHospitals(){
-  const { data } = await supabase.from("hospitals").select("*");
+/* Haversine Distance Formula */
+function calculateDistance(lat1, lon1, lat2, lon2){
+
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+
+  const a =
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1*Math.PI/180) *
+    Math.cos(lat2*Math.PI/180) *
+    Math.sin(dLon/2) *
+    Math.sin(dLon/2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+  return R * c;
+}
+
+/* Load & Sort Hospitals */
+async function loadHospitals(lat, lng){
+
+  const { data, error } = await supabase
+    .from("hospitals")
+    .select("*");
+
+  if(error){
+    console.log("Hospital fetch error:", error);
+    return;
+  }
+
+  if(!data) return;
+
+  // Add distance
+  const withDistance = data.map(h => ({
+    ...h,
+    distance: calculateDistance(lat, lng, h.lat, h.lng)
+  }));
+
+  // Sort nearest first
+  withDistance.sort((a,b) => a.distance - b.distance);
+
   const dropdown = document.getElementById("hospitalDropdown");
-  dropdown.innerHTML="";
-  data.forEach(h=>{
-    const option=document.createElement("option");
-    option.value=h.id;
-    option.text=h.name;
+  dropdown.innerHTML = "";
+
+  withDistance.forEach(h => {
+    const option = document.createElement("option");
+    option.value = h.id;
+    option.text =
+      `${h.name} - ${h.distance.toFixed(2)} km`;
     dropdown.appendChild(option);
   });
 }
-await loadHospitals();
 
 /* GPS Tracking */
 navigator.geolocation.watchPosition(async(pos)=>{
@@ -73,23 +113,36 @@ navigator.geolocation.watchPosition(async(pos)=>{
   document.getElementById("status").innerText =
     `📍 ${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`;
 
+  // Update live location in database
   await supabase.from("ambulance_location")
   .upsert(
     {ambulance_id:1, lat:currentLat, lng:currentLng},
     {onConflict:"ambulance_id"}
   );
 
-});
+  // 🔥 Update nearest hospitals dynamically
+  loadHospitals(currentLat, currentLng);
 
-/* Set Destination */
+},
+(error)=>{
+  console.log("GPS error:", error);
+},
+{ enableHighAccuracy:true }
+);
+
+/* Save selected destination */
 document.getElementById("hospitalDropdown")
 .addEventListener("change", async function(){
+
+  const hospitalId = this.value;
 
   const { data } = await supabase
     .from("hospitals")
     .select("*")
-    .eq("id", this.value)
+    .eq("id", hospitalId)
     .single();
+
+  if(!data) return;
 
   await supabase.from("ambulance_location")
   .update({
