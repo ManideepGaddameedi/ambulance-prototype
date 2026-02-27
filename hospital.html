@@ -1,16 +1,39 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Hospital Dashboard</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <style>#map{height:500px}</style>
+  <title>🏥 Hospital Dashboard</title>
+  <style>
+    body {
+      font-family:Segoe UI;
+      background:#1d4350;
+      color:white;
+      padding:20px;
+    }
+    input, button {
+      padding:8px;
+      margin-top:8px;
+      width:200px;
+      border-radius:6px;
+    }
+    button {
+      background:#00c853;
+      color:white;
+      border:none;
+      cursor:pointer;
+    }
+  </style>
 </head>
 <body>
 
-<h2>👮 Live Tracking</h2>
-<div id="map"></div>
+<h2>🏥 Hospital Availability Update</h2>
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<label>Beds Available:</label><br>
+<input type="number" id="beds"><br>
+
+<label>Doctors Available:</label><br>
+<input type="number" id="doctors"><br>
+
+<button id="updateBtn">Update Availability</button>
 
 <script type="module">
 
@@ -21,59 +44,27 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
 );
 
-const map=L.map('map').setView([17.3850,78.4867],13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+// IMPORTANT: Change hospital_id based on hospital
+const hospital_id = 1;
 
-let marker=L.marker([17.3850,78.4867]).addTo(map);
-let routeLine=null;
-let info=L.control({position:'bottomleft'});
+document.getElementById("updateBtn")
+.addEventListener("click", async function(){
 
-info.onAdd=function(){
-  this._div=L.DomUtil.create('div');
-  this._div.style.background="white";
-  this._div.style.padding="8px";
-  this._div.style.borderRadius="8px";
-  return this._div;
-};
-info.addTo(map);
+  const beds = document.getElementById("beds").value;
+  const doctors = document.getElementById("doctors").value;
 
-async function drawRoute(startLat,startLng,destLat,destLng){
+  await supabase
+    .from("hospitals")
+    .update({
+      available_beds: beds,
+      available_doctors: doctors
+    })
+    .eq("id", hospital_id);
 
-  const res=await fetch(
-  `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson`
-  );
+  alert("Availability Updated");
 
-  const data=await res.json();
-  if(!data.routes) return;
-
-  const route=data.routes[0];
-
-  if(routeLine) map.removeLayer(routeLine);
-  routeLine=L.geoJSON(route.geometry).addTo(map);
-
-  info._div.innerHTML=
-    `<b>Distance:</b> ${(route.distance/1000).toFixed(2)} km<br>
-     <b>ETA:</b> ${(route.duration/60).toFixed(0)} mins`;
-}
-
-supabase.channel("track")
-.on("postgres_changes",
-  {event:"*",schema:"public",table:"ambulance_location"},
-  async(payload)=>{
-
-    const {lat,lng,dest_lat,dest_lng}=payload.new;
-
-    marker.setLatLng([lat,lng]);
-    map.panTo([lat,lng]);
-
-    if(dest_lat && dest_lng){
-      drawRoute(lat,lng,dest_lat,dest_lng);
-    }
-  }
-)
-.subscribe();
+});
 
 </script>
 </body>
 </html>
-
