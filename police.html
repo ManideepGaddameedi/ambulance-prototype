@@ -1,43 +1,48 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Police Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <title>Police Dashboard</title>
 </head>
 <body>
 
-<h2>👮 Police Live Tracking</h2>
+<h2>👮 Police Dashboard</h2>
 
-<div id="location"></div>
+<div id="alertBox"></div>
+<div id="locationBox"></div>
 
-<script>
+<script type="module">
 
-const supabase = window.supabase.createClient(
-  "YOUR_SUPABASE_URL",
-  "YOUR_ANON_KEY"
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm"
+
+const supabase = createClient(
+  "https://cfmxqwaopfahthflqgih.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
 );
 
+/* ALERT LISTENER */
 supabase
-.channel('ambulance-location')
-.on('postgres_changes',{
-  event:'UPDATE',
-  schema:'public',
-  table:'ambulance_location'
-}, payload=>{
-  document.getElementById("location").innerHTML =
-  `Live Location: ${payload.new.lat}, ${payload.new.lng}`;
-})
+.channel("alert-channel")
+.on(
+  "postgres_changes",
+  { event: "INSERT", schema: "public", table: "emergency_alerts" },
+  () => {
+    document.getElementById("alertBox").innerHTML =
+      "🚨 Emergency Alert Received!";
+  }
+)
 .subscribe();
 
+/* LOCATION LISTENER */
 supabase
-.channel('emergency-alert')
-.on('postgres_changes',{
-  event:'INSERT',
-  schema:'public',
-  table:'emergency_alerts'
-}, payload=>{
-  alert("🚨 Emergency Alert Received!");
-})
+.channel("location-channel")
+.on(
+  "postgres_changes",
+  { event: "UPDATE", schema: "public", table: "ambulance_location" },
+  (payload) => {
+    document.getElementById("locationBox").innerHTML =
+      `Live Location: ${payload.new.lat}, ${payload.new.lng}`;
+  }
+)
 .subscribe();
 
 </script>
