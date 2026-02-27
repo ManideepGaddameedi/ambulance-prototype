@@ -3,13 +3,11 @@
 <head>
   <title>👮 Police Dashboard</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <style>
-    #map { height: 500px; }
-  </style>
+  <style>#map{height:500px}</style>
 </head>
 <body>
 
-<h2>👮 Live Ambulance Tracking</h2>
+<h2>👮 Live Tracking</h2>
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -20,59 +18,56 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const supabase = createClient(
   "https://cfmxqwaopfahthflqgih.supabase.co",
-  "YOUR_ANON_KEY"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
 );
 
-const map = L.map('map').setView([17.3850, 78.4867], 13);
+const map=L.map('map').setView([17.3850,78.4867],13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-let marker = L.marker([17.3850, 78.4867]).addTo(map);
-let routeLine = null;
-let infoControl = L.control({ position: 'bottomleft' });
+let marker=L.marker([17.3850,78.4867]).addTo(map);
+let routeLine=null;
+let info=L.control({position:'bottomleft'});
 
-infoControl.onAdd = function () {
-  this._div = L.DomUtil.create('div');
-  this._div.style.background = "white";
-  this._div.style.padding = "8px";
-  this._div.style.borderRadius = "8px";
+info.onAdd=function(){
+  this._div=L.DomUtil.create('div');
+  this._div.style.background="white";
+  this._div.style.padding="8px";
+  this._div.style.borderRadius="8px";
   return this._div;
 };
-infoControl.addTo(map);
+info.addTo(map);
 
-async function drawRoute(startLat, startLng, destLat, destLng) {
+async function drawRoute(startLat,startLng,destLat,destLng){
 
-  const res = await fetch(
-    `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson`
+  const res=await fetch(
+  `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson`
   );
 
-  const data = await res.json();
-  if (!data.routes) return;
+  const data=await res.json();
+  if(!data.routes) return;
 
-  const route = data.routes[0];
+  const route=data.routes[0];
 
-  if (routeLine) map.removeLayer(routeLine);
-  routeLine = L.geoJSON(route.geometry).addTo(map);
+  if(routeLine) map.removeLayer(routeLine);
+  routeLine=L.geoJSON(route.geometry).addTo(map);
 
-  const distance = (route.distance / 1000).toFixed(2);
-  const eta = (route.duration / 60).toFixed(0);
-
-  infoControl._div.innerHTML =
-    `<b>Distance:</b> ${distance} km<br>
-     <b>ETA:</b> ${eta} mins`;
+  info._div.innerHTML=
+    `<b>Distance:</b> ${(route.distance/1000).toFixed(2)} km<br>
+     <b>ETA:</b> ${(route.duration/60).toFixed(0)} mins`;
 }
 
 supabase.channel("track")
 .on("postgres_changes",
-  { event: "*", schema: "public", table: "ambulance_location" },
-  async (payload) => {
+  {event:"*",schema:"public",table:"ambulance_location"},
+  async(payload)=>{
 
-    const { lat, lng, dest_lat, dest_lng } = payload.new;
+    const {lat,lng,dest_lat,dest_lng}=payload.new;
 
-    marker.setLatLng([lat, lng]);
-    map.panTo([lat, lng]);
+    marker.setLatLng([lat,lng]);
+    map.panTo([lat,lng]);
 
-    if (dest_lat && dest_lng) {
-      drawRoute(lat, lng, dest_lat, dest_lng);
+    if(dest_lat && dest_lng){
+      drawRoute(lat,lng,dest_lat,dest_lng);
     }
   }
 )
