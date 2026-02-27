@@ -4,7 +4,8 @@
   <title>👮 Police Dashboard</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
-    #map { height: 500px; }
+    body { font-family: Arial; }
+    #map { height: 500px; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -16,25 +17,28 @@
 
 <script type="module">
 
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm"
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+/* -------- SUPABASE INIT -------- */
 
 const supabase = createClient(
   "https://cfmxqwaopfahthflqgih.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
 );
 
-/* -------- MAP INITIALIZE -------- */
+/* -------- MAP INIT -------- */
 
 const map = L.map('map').setView([17.3850, 78.4867], 13);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
-.addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: "© OpenStreetMap"
+}).addTo(map);
 
 let ambulanceMarker = L.marker([17.3850, 78.4867])
-.addTo(map)
-.bindPopup("🚑 Ambulance");
+  .addTo(map)
+  .bindPopup("🚑 Ambulance");
 
-/* -------- FETCH CURRENT LOCATION FIRST -------- */
+/* -------- LOAD INITIAL LOCATION -------- */
 
 async function loadInitialLocation() {
 
@@ -44,47 +48,52 @@ async function loadInitialLocation() {
     .eq("ambulance_id", 1)
     .single();
 
-  if(error){
-    console.log("Initial fetch error:", error);
+  if (error) {
+    console.log("Initial Fetch Error:", error);
     return;
   }
 
-  console.log("Initial Data:", data);
-
-  ambulanceMarker.setLatLng([data.lat, data.lng]);
-  map.setView([data.lat, data.lng], 15);
-
+  if (data) {
+    ambulanceMarker.setLatLng([data.lat, data.lng]);
+    map.setView([data.lat, data.lng], 15);
+  }
 }
 
 await loadInitialLocation();
 
 /* -------- REALTIME SUBSCRIPTION -------- */
 
-supabase
-.channel("ambulance-tracking")
-.on(
-  "postgres_changes",
-  {
-    event: "*",
-    schema: "public",
-    table: "ambulance_location"
-  },
-  (payload) => {
+const channel = supabase.channel("ambulance-tracking");
 
-    console.log("Realtime Payload:", payload);
+channel
+  .on(
+    "postgres_changes",
+    {
+      event: "*",
+      schema: "public",
+      table: "ambulance_location"
+    },
+    (payload) => {
 
-    if (!payload.new) return;
+      console.log("Realtime Payload:", payload);
 
-    const lat = payload.new.lat;
-    const lng = payload.new.lng;
+      if (!payload.new) return;
 
-    ambulanceMarker.setLatLng([lat, lng]);
-    map.setView([lat, lng], 15);
+      const lat = payload.new.lat;
+      const lng = payload.new.lng;
 
-  }
-)
-.subscribe((status) => {
-  console.log("Realtime Status:", status);
+      ambulanceMarker.setLatLng([lat, lng]);
+      map.setView([lat, lng], 15);
+    }
+  )
+  .subscribe((status) => {
+    console.log("Realtime Status:", status);
+  });
+
+/* -------- CLEANUP (PREVENT CHANNEL ERROR LOOP) -------- */
+
+window.addEventListener("beforeunload", () => {
+  supabase.removeChannel(channel);
 });
 
 </script>
