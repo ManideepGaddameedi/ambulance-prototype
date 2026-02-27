@@ -23,7 +23,8 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
 );
 
-/* Initialize Map */
+/* -------- MAP INITIALIZE -------- */
+
 const map = L.map('map').setView([17.3850, 78.4867], 13);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
@@ -33,13 +34,44 @@ let ambulanceMarker = L.marker([17.3850, 78.4867])
 .addTo(map)
 .bindPopup("🚑 Ambulance");
 
-/* Realtime Tracking */
+/* -------- FETCH CURRENT LOCATION FIRST -------- */
+
+async function loadInitialLocation() {
+
+  const { data, error } = await supabase
+    .from("ambulance_location")
+    .select("*")
+    .eq("ambulance_id", 1)
+    .single();
+
+  if(error){
+    console.log("Initial fetch error:", error);
+    return;
+  }
+
+  console.log("Initial Data:", data);
+
+  ambulanceMarker.setLatLng([data.lat, data.lng]);
+  map.setView([data.lat, data.lng], 15);
+
+}
+
+await loadInitialLocation();
+
+/* -------- REALTIME SUBSCRIPTION -------- */
+
 supabase
 .channel("ambulance-tracking")
 .on(
   "postgres_changes",
-  { event: "*", schema: "public", table: "ambulance_location" },
+  {
+    event: "*",
+    schema: "public",
+    table: "ambulance_location"
+  },
   (payload) => {
+
+    console.log("Realtime Payload:", payload);
 
     if (!payload.new) return;
 
