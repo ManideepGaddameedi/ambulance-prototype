@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>🚑Ambulance Green Signal</title>
+  <title>🚑 Smart Ambulance</title>
   <style>
     body {
       margin:0;
@@ -14,13 +14,13 @@
     }
     .box{
       background:white;
-      width:420px;
+      width:430px;
       padding:25px;
       border-radius:20px;
       box-shadow:0 15px 40px rgba(0,0,0,0.3);
       text-align:center;
     }
-    select, button{
+    select,button{
       width:100%;
       padding:10px;
       margin-top:10px;
@@ -32,19 +32,23 @@
       border:none;
       cursor:pointer;
     }
+    #status{
+      font-size:14px;
+      margin-bottom:10px;
+    }
   </style>
 </head>
 <body>
 
 <div class="box">
-  <h2>🚑AMBULANCE GREEN SIGNAL</h2>
-  <h3>GREEN SIGNALS FOR RED ALERTS</h3>
+  <h2>🚑 Smart Ambulance</h2>
+
   <p id="status">Waiting for GPS...</p>
 
-  <!-- 🚨 Emergency Alert Button -->
+  <!-- Emergency Alert Button -->
   <button id="alertBtn">🚨 SEND EMERGENCY ALERT</button>
 
-  <h4>🏥 Nearby Hospitals </h4>
+  <h4>🏥 Nearby Hospitals (5km Radius)</h4>
   <select id="hospitalDropdown"></select>
 </div>
 
@@ -74,7 +78,7 @@ function calculateDistance(lat1, lon1, lat2, lon2){
   return R * c;
 }
 
-/* Fetch Nearby Hospitals (Overpass API) */
+/* Load Nearby Hospitals + Availability */
 async function loadNearbyHospitals(lat, lng){
 
   const radius = 5000;
@@ -92,16 +96,37 @@ async function loadNearbyHospitals(lat, lng){
     { method: "POST", body: query }
   );
 
-  const data = await response.json();
-  if(!data.elements) return;
+  const osmData = await response.json();
+  if(!osmData.elements) return;
 
-  const hospitals = data.elements.map(h => ({
-    name: h.tags.name || "Hospital",
-    lat: h.lat,
-    lng: h.lon,
-    distance: calculateDistance(lat, lng, h.lat, h.lon)
-  }));
+  const hospitals = [];
 
+  for(const h of osmData.elements){
+
+    const name = h.tags.name || "Hospital";
+
+    const distance = calculateDistance(
+      lat, lng, h.lat, h.lon
+    );
+
+    // Fetch availability from Supabase (if exists)
+    const { data } = await supabase
+      .from("hospitals")
+      .select("available_beds, available_doctors")
+      .eq("name", name)
+      .single();
+
+    hospitals.push({
+      name:name,
+      lat:h.lat,
+      lng:h.lon,
+      distance:distance,
+      beds: data ? data.available_beds : "N/A",
+      doctors: data ? data.available_doctors : "N/A"
+    });
+  }
+
+  // Sort nearest first
   hospitals.sort((a,b)=>a.distance-b.distance);
 
   const dropdown = document.getElementById("hospitalDropdown");
@@ -110,7 +135,8 @@ async function loadNearbyHospitals(lat, lng){
   hospitals.forEach(h=>{
     const option=document.createElement("option");
     option.value=JSON.stringify({lat:h.lat,lng:h.lng});
-    option.text=`${h.name} - ${h.distance.toFixed(2)} km`;
+    option.text=
+      `${h.name} - ${h.distance.toFixed(2)} km | Beds: ${h.beds} | Doctors: ${h.doctors}`;
     dropdown.appendChild(option);
   });
 }
@@ -124,17 +150,24 @@ navigator.geolocation.watchPosition(async(pos)=>{
   document.getElementById("status").innerText =
     `📍 ${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`;
 
+  // Update ambulance live location
   await supabase.from("ambulance_location")
   .upsert(
     {ambulance_id:1, lat:currentLat, lng:currentLng},
     {onConflict:"ambulance_id"}
   );
 
-  loadNearbyHospitals(currentLat, currentLng);
+  // Refresh hospital list
+  loadNearbyHospitals(currentLat,currentLng);
 
-});
+},
+(error)=>{
+  console.log("GPS Error:", error);
+},
+{ enableHighAccuracy:true }
+);
 
-/* Save Destination */
+/* Save Selected Destination */
 document.getElementById("hospitalDropdown")
 .addEventListener("change", async function(){
 
@@ -149,20 +182,18 @@ document.getElementById("hospitalDropdown")
 
 });
 
-/* 🚨 Emergency Alert */
+/* Emergency Alert */
 document.getElementById("alertBtn")
 .addEventListener("click", async function(){
 
   await supabase.from("ambulance_location")
-  .update({ emergency:true })
-  .eq("ambulance_id",1);
+  .upsert(
+    {ambulance_id:1, emergency:true},
+    {onConflict:"ambulance_id"}
+  );
 
 });
 
 </script>
-
 </body>
 </html>
-
-
-
