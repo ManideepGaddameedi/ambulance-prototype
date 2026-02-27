@@ -1,14 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Ambulance Panel</title>
+  <title>🚑 Ambulance Panel</title>
 </head>
 <body>
 
 <h2>🚑 Ambulance Live Tracking</h2>
-
 <p id="status">Waiting for GPS...</p>
-
 <button id="alertBtn">🚨 Send Emergency Alert</button>
 
 <script type="module">
@@ -20,16 +18,15 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
 );
 
-/* -------- Ensure Row Exists -------- */
+/* Ensure row exists */
 await supabase
   .from("ambulance_location")
-  .upsert({
-    ambulance_id: 1,
-    lat: 17.3850,
-    lng: 78.4867
-  }, { onConflict: 'ambulance_id' });
+  .upsert(
+    { ambulance_id: 1, lat: 17.3850, lng: 78.4867 },
+    { onConflict: "ambulance_id" }
+  );
 
-/* -------- LIVE GPS TRACKING -------- */
+/* Live GPS Tracking */
 navigator.geolocation.watchPosition(
   async (position) => {
 
@@ -39,30 +36,21 @@ navigator.geolocation.watchPosition(
     document.getElementById("status").innerText =
       "Live Location: " + lat + ", " + lng;
 
-    const { error } = await supabase
+    await supabase
       .from("ambulance_location")
-      .upsert({
-        ambulance_id: 1,
-        lat: lat,
-        lng: lng
-      }, { onConflict: 'ambulance_id' });
-
-    if(error){
-      console.log("Update Error:", error);
-    }
+      .upsert(
+        { ambulance_id: 1, lat: lat, lng: lng },
+        { onConflict: "ambulance_id" }
+      );
 
   },
   (error) => {
     console.log("GPS Error:", error);
   },
-  {
-    enableHighAccuracy: true,
-    maximumAge: 0,
-    timeout: 5000
-  }
+  { enableHighAccuracy: true }
 );
 
-/* -------- SEND ALERT -------- */
+/* Send Alert */
 document.getElementById("alertBtn").addEventListener("click", async () => {
 
   const { data } = await supabase
@@ -79,7 +67,7 @@ document.getElementById("alertBtn").addEventListener("click", async () => {
       longitude: data.lng
     }]);
 
-  alert("🚨 Alert Sent");
+  alert("🚨 Alert Sent to Police & Hospital");
 
 });
 
