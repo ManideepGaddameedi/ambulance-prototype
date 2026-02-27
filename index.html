@@ -2,7 +2,6 @@
 <html>
 <head>
   <title>🚑 Ambulance Panel</title>
-
   <style>
     body {
       margin: 0;
@@ -13,7 +12,6 @@
       align-items: center;
       height: 100vh;
     }
-
     .container {
       background: white;
       width: 420px;
@@ -22,88 +20,41 @@
       box-shadow: 0 15px 40px rgba(0,0,0,0.3);
       text-align: center;
     }
-
-    .title {
-      font-size: 22px;
-      font-weight: bold;
-      color: #b30000;
-      margin-bottom: 10px;
-    }
-
     .status-box {
       background: #f5f5f5;
       padding: 12px;
       border-radius: 10px;
       margin: 15px 0;
-      font-size: 14px;
-      color: #333;
-      min-height: 20px;
     }
-
-    .btn-alert {
+    button {
       width: 100%;
       padding: 12px;
-      background: #ff0000;
+      background: red;
       color: white;
       border: none;
       border-radius: 10px;
-      font-size: 16px;
       cursor: pointer;
-      transition: 0.3s;
     }
-
-    .btn-alert:hover {
-      background: #cc0000;
-      transform: scale(1.03);
-    }
-
     select {
       width: 100%;
       padding: 10px;
       margin-top: 10px;
       border-radius: 8px;
-      border: 1px solid #ccc;
-    }
-
-    .footer {
-      margin-top: 15px;
-      font-size: 12px;
-      color: gray;
-    }
-
-    .pulse {
-      animation: pulse 1.5s infinite;
-    }
-
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(255,0,0,0.6); }
-      70% { box-shadow: 0 0 0 15px rgba(255,0,0,0); }
-      100% { box-shadow: 0 0 0 0 rgba(255,0,0,0); }
     }
   </style>
 </head>
-
 <body>
 
 <div class="container">
-  <div class="title">🚑 Smart Ambulance Control</div>
+  <h2>🚑 Smart Ambulance</h2>
+  <div class="status-box" id="status">Waiting for GPS...</div>
 
-  <div class="status-box pulse" id="status">
-    Waiting for GPS...
-  </div>
+  <button id="alertBtn">🚨 SEND EMERGENCY ALERT</button>
 
-  <button class="btn-alert" id="alertBtn">
-    🚨 SEND EMERGENCY ALERT
-  </button>
-
-  <h4 style="margin-top:20px;">🏥 Nearby Hospitals</h4>
+  <h4>🏥 Select Destination Hospital</h4>
   <select id="hospitalDropdown">
-    <option>Detecting location...</option>
+    <option>Loading hospitals...</option>
   </select>
-
-  <div class="footer">
-    Real-Time Emergency Tracking System
-  </div>
 </div>
 
 <script type="module">
@@ -112,117 +63,68 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const supabase = createClient(
   "https://cfmxqwaopfahthflqgih.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
+  "YOUR_ANON_KEY"
 );
 
-/* Ensure ambulance row exists */
-await supabase
-  .from("ambulance_location")
-  .upsert(
-    { ambulance_id: 1, lat: 17.3850, lng: 78.4867 },
-    { onConflict: "ambulance_id" }
-  );
+let currentLat = 0;
+let currentLng = 0;
 
-/* Distance Calculation (Haversine Formula) */
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
+/* Live GPS */
+navigator.geolocation.watchPosition(async (pos) => {
 
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) *
-    Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) *
-    Math.sin(dLon / 2);
+  currentLat = pos.coords.latitude;
+  currentLng = pos.coords.longitude;
 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
+  document.getElementById("status").innerText =
+    `📍 ${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`;
 
-/* Load Nearby Hospitals */
-async function loadNearbyHospitals(currentLat, currentLng) {
+  await supabase
+    .from("ambulance_location")
+    .upsert(
+      { ambulance_id: 1, lat: currentLat, lng: currentLng },
+      { onConflict: "ambulance_id" }
+    );
 
-  const { data, error } = await supabase
-    .from("hospitals")
-    .select("*");
+});
 
-  if (error) {
-    console.log(error);
-    return;
-  }
+/* Load Hospitals */
+async function loadHospitals() {
+
+  const { data } = await supabase.from("hospitals").select("*");
 
   const dropdown = document.getElementById("hospitalDropdown");
   dropdown.innerHTML = "";
 
-  data.forEach(hospital => {
-
-    const distance = calculateDistance(
-      currentLat,
-      currentLng,
-      hospital.lat,
-      hospital.lng
-    );
-
-    const eta = (distance / 40) * 60;
-
+  data.forEach(h => {
     const option = document.createElement("option");
-    option.value = hospital.id;
-    option.text =
-      `${hospital.name} - ${distance.toFixed(2)} km - ETA ${eta.toFixed(0)} mins`;
-
+    option.value = h.id;
+    option.text = h.name;
     dropdown.appendChild(option);
   });
 }
 
-/* Live GPS Tracking */
-navigator.geolocation.watchPosition(
-  async (position) => {
+await loadHospitals();
 
-    const lat = position.coords.latitude;
-    const lng = position.coords.longitude;
+/* Select Hospital */
+document.getElementById("hospitalDropdown")
+.addEventListener("change", async function() {
 
-    document.getElementById("status").innerText =
-      "📍 Live Location: " + lat.toFixed(5) + ", " + lng.toFixed(5);
-
-    await supabase
-      .from("ambulance_location")
-      .upsert(
-        { ambulance_id: 1, lat: lat, lng: lng },
-        { onConflict: "ambulance_id" }
-      );
-
-    loadNearbyHospitals(lat, lng);
-
-  },
-  (error) => {
-    console.log("GPS Error:", error);
-  },
-  { enableHighAccuracy: true }
-);
-
-/* Send Emergency Alert */
-document.getElementById("alertBtn").addEventListener("click", async () => {
-
-  const { data } = await supabase
-    .from("ambulance_location")
-    .select("*")
-    .eq("ambulance_id", 1)
-    .single();
+  const hospitalId = this.value;
 
   await supabase
     .from("emergency_alerts")
     .insert([{
       ambulance_id: 1,
-      latitude: data.lat,
-      longitude: data.lng
+      latitude: currentLat,
+      longitude: currentLng,
+      hospital_id: hospitalId,
+      status: "ACTIVE"
     }]);
 
-  alert("🚨 Emergency Alert Sent Successfully");
+  alert("🏥 Destination Selected");
 
 });
 
 </script>
-
 </body>
 </html>
