@@ -2,13 +2,22 @@
 <html>
 <head>
   <title>Police Dashboard</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+  <style>
+    #map { height: 500px; width: 100%; }
+  </style>
 </head>
 <body>
 
-<h2>👮 Police Dashboard</h2>
+<h2>👮 Police Live Ambulance Tracking</h2>
 
-<div id="alertBox"></div>
-<div id="locationBox"></div>
+<div id="map"></div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script type="module">
 
@@ -19,32 +28,34 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
 );
 
-/* ALERT LISTENER */
-supabase
-.channel("alert-channel")
-.on(
-  "postgres_changes",
-  { event: "INSERT", schema: "public", table: "emergency_alerts" },
-  () => {
-    document.getElementById("alertBox").innerHTML =
-      "🚨 Emergency Alert Received!";
-  }
-)
-.subscribe();
+/* -------- Initialize Map -------- */
+const map = L.map('map').setView([17.3850, 78.4867], 13);
 
-/* LOCATION LISTENER */
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap'
+}).addTo(map);
+
+let ambulanceMarker = L.marker([17.3850, 78.4867]).addTo(map);
+
+/* -------- Real-time Location -------- */
 supabase
 .channel("location-channel")
 .on(
   "postgres_changes",
   { event: "UPDATE", schema: "public", table: "ambulance_location" },
   (payload) => {
-    document.getElementById("locationBox").innerHTML =
-      `Live Location: ${payload.new.lat}, ${payload.new.lng}`;
+
+    const lat = payload.new.lat;
+    const lng = payload.new.lng;
+
+    ambulanceMarker.setLatLng([lat, lng]);
+    map.panTo([lat, lng]);
+
   }
 )
 .subscribe();
 
 </script>
+
 </body>
 </html>
