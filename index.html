@@ -45,7 +45,7 @@
 
   <p id="status">Waiting for GPS...</p>
 
-  <!-- Emergency Alert Button -->
+  
   <button id="alertBtn">🚨 SEND EMERGENCY ALERT</button>
 
   <h4>🏥 Nearby Hospitals (5km Radius)</h4>
@@ -64,7 +64,7 @@ const supabase = createClient(
 let currentLat = 0;
 let currentLng = 0;
 
-/* Distance Formula */
+
 function calculateDistance(lat1, lon1, lat2, lon2){
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -78,7 +78,7 @@ function calculateDistance(lat1, lon1, lat2, lon2){
   return R * c;
 }
 
-/* Load Nearby Hospitals + Availability */
+
 async function loadNearbyHospitals(lat, lng){
 
   const radius = 5000;
@@ -109,7 +109,7 @@ async function loadNearbyHospitals(lat, lng){
       lat, lng, h.lat, h.lon
     );
 
-    // Fetch availability from Supabase (if exists)
+   
     const { data } = await supabase
       .from("hospitals")
       .select("available_beds, available_doctors")
@@ -126,7 +126,7 @@ async function loadNearbyHospitals(lat, lng){
     });
   }
 
-  // Sort nearest first
+ 
   hospitals.sort((a,b)=>a.distance-b.distance);
 
   const dropdown = document.getElementById("hospitalDropdown");
@@ -141,7 +141,7 @@ async function loadNearbyHospitals(lat, lng){
   });
 }
 
-/* GPS Tracking */
+
 navigator.geolocation.watchPosition(async(pos)=>{
 
   currentLat = pos.coords.latitude;
@@ -150,14 +150,14 @@ navigator.geolocation.watchPosition(async(pos)=>{
   document.getElementById("status").innerText =
     `📍 ${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`;
 
-  // Update ambulance live location
+ 
   await supabase.from("ambulance_location")
   .upsert(
     {ambulance_id:1, lat:currentLat, lng:currentLng},
     {onConflict:"ambulance_id"}
   );
 
-  // Refresh hospital list
+ 
   loadNearbyHospitals(currentLat,currentLng);
 
 },
@@ -167,7 +167,7 @@ navigator.geolocation.watchPosition(async(pos)=>{
 { enableHighAccuracy:true }
 );
 
-/* Save Selected Destination */
+
 document.getElementById("hospitalDropdown")
 .addEventListener("change", async function(){
 
@@ -182,7 +182,7 @@ document.getElementById("hospitalDropdown")
 
 });
 
-/* Emergency Alert */
+
 document.getElementById("alertBtn")
 .addEventListener("click", async function(){
 
@@ -197,3 +197,4 @@ document.getElementById("alertBtn")
 </script>
 </body>
 </html>
+
