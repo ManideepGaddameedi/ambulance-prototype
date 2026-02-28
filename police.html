@@ -32,19 +32,19 @@
 
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-/* Supabase Connection */
+
 const supabase = createClient(
   "https://cfmxqwaopfahthflqgih.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbXhxd2FvcGZhaHRoZmxxZ2loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNjg4NjEsImV4cCI6MjA4NzY0NDg2MX0.38jNHf-7UGhIelL87oWxB5eK0e5ZivfGSsyEv1C9pL0"
 );
 
-/* Map Setup */
+
 const map = L.map('map').setView([17.3850,78.4867],13);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
 .addTo(map);
 
-/* Ambulance Icon */
+
 const ambulanceIcon = L.icon({
   iconUrl:"https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
   iconSize:[40,40],
@@ -53,10 +53,10 @@ const ambulanceIcon = L.icon({
 
 let marker = L.marker([17.3850,78.4867],{icon:ambulanceIcon}).addTo(map);
 
-/* Route Line */
+
 let routeLine = null;
 
-/* Info Box (Distance + ETA) */
+
 let info = L.control({position:'bottomleft'});
 
 info.onAdd = function(){
@@ -69,7 +69,7 @@ info.onAdd = function(){
 };
 info.addTo(map);
 
-/* Draw Route Function */
+
 async function drawRoute(startLat,startLng,destLat,destLng){
 
   const res = await fetch(
@@ -90,7 +90,7 @@ async function drawRoute(startLat,startLng,destLat,destLng){
      <b>ETA:</b> ${(route.duration/60).toFixed(0)} mins`;
 }
 
-/* Load Initial Position */
+
 async function loadInitial(){
   const { data } = await supabase
     .from("ambulance_location")
@@ -105,7 +105,7 @@ async function loadInitial(){
 }
 await loadInitial();
 
-/* Realtime Listener */
+
 supabase.channel("ambulance-live")
 .on(
   "postgres_changes",
@@ -118,16 +118,16 @@ supabase.channel("ambulance-live")
 
     const {lat,lng,dest_lat,dest_lng,emergency} = payload.new;
 
-    /* Move Ambulance */
+    
     marker.setLatLng([lat,lng]);
     map.panTo([lat,lng]);
 
-    /* Draw Route If Destination Exists */
+    
     if(dest_lat && dest_lng){
       drawRoute(lat,lng,dest_lat,dest_lng);
     }
 
-    /* Emergency Alert */
+   
     if(emergency === true){
       alert("🚨 EMERGENCY ALERT FROM AMBULANCE!");
     }
@@ -140,3 +140,4 @@ supabase.channel("ambulance-live")
 
 </body>
 </html>
+
